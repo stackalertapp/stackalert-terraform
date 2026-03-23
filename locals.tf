@@ -12,4 +12,8 @@ locals {
     },
     var.tags
   )
+
+  # Normalised set of active channels — used for conditional resource creation
+  # and IAM policy scoping throughout the module.
+  channels = toset([for c in split(",", var.notification_channels) : trimspace(c)])
 }

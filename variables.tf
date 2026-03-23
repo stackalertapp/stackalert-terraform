@@ -20,16 +20,45 @@ variable "artifact_s3_key" {
   default     = "stackalert-lambda/latest.zip"
 }
 
-variable "telegram_chat_id" {
-  description = "Telegram chat/group ID to send cost alerts to."
+variable "notification_channels" {
+  description = "Comma-separated list of notification channels to enable. Valid values: slack, telegram, pagerduty. Example: \"slack,telegram\""
+  type        = string
+  default     = "slack"
+
+  validation {
+    condition = alltrue([
+      for c in split(",", var.notification_channels) :
+      contains(["slack", "telegram", "pagerduty"], trimspace(c))
+    ])
+    error_message = "notification_channels must be a comma-separated list containing only: slack, telegram, pagerduty."
+  }
+}
+
+variable "slack_webhook_url" {
+  description = "Slack incoming webhook URL. Required when 'slack' is in notification_channels."
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "telegram_bot_token" {
-  description = "Telegram bot token (stored in SSM SecureString — passed here for initial creation)."
+  description = "Telegram bot token. Required when 'telegram' is in notification_channels."
   type        = string
   sensitive   = true
+  default     = ""
+}
+
+variable "telegram_chat_id" {
+  description = "Telegram chat/group ID to send cost alerts to. Required when 'telegram' is in notification_channels."
+  type        = string
+  default     = ""
+}
+
+variable "pagerduty_routing_key" {
+  description = "PagerDuty Events API v2 routing/integration key. Required when 'pagerduty' is in notification_channels."
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "spike_threshold_pct" {

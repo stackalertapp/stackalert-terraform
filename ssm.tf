@@ -1,22 +1,60 @@
 # ============================================================
-# SSM Parameter Store: Telegram bot token (SecureString)
-# Encrypted with AWS managed key (aws/ssm) by default.
+# SSM Parameter Store: per-channel secrets (SecureString)
+# Each parameter is only created when its channel is enabled.
+# Encrypted with the AWS managed key (aws/ssm) by default.
 # Set create_kms_key = true to use a dedicated CMK instead.
 # ============================================================
 
+# ── Telegram ──────────────────────────────────────────────────
+
 resource "aws_ssm_parameter" "telegram_bot_token" {
+  count = contains(local.channels, "telegram") ? 1 : 0
+
   name        = "/stackalert/${var.environment}/telegram-bot-token"
   description = "StackAlert Telegram bot token — managed by Terraform"
   type        = "SecureString"
   value       = var.telegram_bot_token
-
-  # Use customer-managed KMS key if created, otherwise fall back to AWS managed key
-  key_id = var.create_kms_key ? aws_kms_key.ssm[0].key_id : "alias/aws/ssm"
+  key_id      = var.create_kms_key ? aws_kms_key.ssm[0].key_id : "alias/aws/ssm"
 
   tags = local.common_tags
 
   lifecycle {
-    # Prevent accidental token rotation via terraform plan diff
+    ignore_changes = [value]
+  }
+}
+
+# ── Slack ──────────────────────────────────────────────────────
+
+resource "aws_ssm_parameter" "slack_webhook_url" {
+  count = contains(local.channels, "slack") ? 1 : 0
+
+  name        = "/stackalert/${var.environment}/slack-webhook-url"
+  description = "StackAlert Slack incoming webhook URL — managed by Terraform"
+  type        = "SecureString"
+  value       = var.slack_webhook_url
+  key_id      = var.create_kms_key ? aws_kms_key.ssm[0].key_id : "alias/aws/ssm"
+
+  tags = local.common_tags
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+# ── PagerDuty ──────────────────────────────────────────────────
+
+resource "aws_ssm_parameter" "pagerduty_routing_key" {
+  count = contains(local.channels, "pagerduty") ? 1 : 0
+
+  name        = "/stackalert/${var.environment}/pagerduty-routing-key"
+  description = "StackAlert PagerDuty Events API v2 routing key — managed by Terraform"
+  type        = "SecureString"
+  value       = var.pagerduty_routing_key
+  key_id      = var.create_kms_key ? aws_kms_key.ssm[0].key_id : "alias/aws/ssm"
+
+  tags = local.common_tags
+
+  lifecycle {
     ignore_changes = [value]
   }
 }

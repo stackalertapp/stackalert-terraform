@@ -49,19 +49,24 @@ resource "aws_iam_role_policy" "lambda_logs" {
 }
 
 # ============================================================
-# SSM: allow Lambda to read the Telegram bot token only
+# SSM: allow Lambda to read channel secrets
+# Scoped to only the SSM parameters that were created for the
+# active notification channels.
 # ============================================================
 
 data "aws_iam_policy_document" "lambda_ssm" {
   statement {
-    sid    = "AllowSSMGetBotToken"
+    sid    = "AllowSSMGetChannelSecrets"
     effect = "Allow"
     actions = [
       "ssm:GetParameter",
     ]
-    resources = [
-      aws_ssm_parameter.telegram_bot_token.arn,
-    ]
+    # compact() strips empty strings — only created params are included
+    resources = compact([
+      length(aws_ssm_parameter.slack_webhook_url) > 0 ? aws_ssm_parameter.slack_webhook_url[0].arn : "",
+      length(aws_ssm_parameter.telegram_bot_token) > 0 ? aws_ssm_parameter.telegram_bot_token[0].arn : "",
+      length(aws_ssm_parameter.pagerduty_routing_key) > 0 ? aws_ssm_parameter.pagerduty_routing_key[0].arn : "",
+    ])
   }
 
   statement {
@@ -76,7 +81,7 @@ data "aws_iam_policy_document" "lambda_ssm" {
 }
 
 resource "aws_iam_role_policy" "lambda_ssm" {
-  name   = "ssm-read-bot-token"
+  name   = "ssm-read-channel-secrets"
   role   = aws_iam_role.stackalert.id
   policy = data.aws_iam_policy_document.lambda_ssm.json
 }
