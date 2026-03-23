@@ -70,6 +70,40 @@ resource "aws_kms_key" "ssm" {
   description         = "KMS key for StackAlert SSM parameters"
   enable_key_rotation = true
   tags                = local.common_tags
+
+  # Explicit key policy (CKV2_AWS_64): account root full access + Lambda + SSM service
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EnableRootAccountAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowLambdaDecrypt"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.stackalert.arn
+        }
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowSSMServiceUse"
+        Effect = "Allow"
+        Principal = {
+          Service = "ssm.amazonaws.com"
+        }
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Resource = "*"
+      }
+    ]
+  })
 }
 
 resource "aws_kms_alias" "ssm" {

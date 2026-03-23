@@ -30,16 +30,3 @@ provider "aws" {
   }
 }
 
-# Cost Explorer MUST be queried from us-east-1 (AWS requirement)
-provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
-
-  default_tags {
-    tags = {
-      Project     = "stackalert"
-      ManagedBy   = "terraform"
-      Repository  = "stackalertapp/stackalert-terraform"
-    }
-  }
-}

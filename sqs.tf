@@ -6,6 +6,7 @@
 resource "aws_sqs_queue" "dlq" {
   name                      = "stackalert-${var.environment}-dlq"
   message_retention_seconds = 1209600 # 14 days
+  sqs_managed_sse_enabled   = true    # SSE-SQS encryption at rest (CKV_AWS_27)
 
   tags = local.common_tags
 }

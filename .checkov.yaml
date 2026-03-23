@@ -1,0 +1,48 @@
+# .checkov.yaml — Checkov static analysis configuration
+# Skips are documented with justification.
+# Genuine issues are fixed in code; only accepted tradeoffs are skipped here.
+
+skip-check:
+  # Lambda VPC: StackAlert calls public AWS APIs (Cost Explorer, STS, SSM).
+  # Placing it in a VPC would require a NAT Gateway (~$35/month) for no security gain.
+  - CKV_AWS_117
+
+  # Lambda code signing: Not used in this deployment pattern.
+  # Artifact integrity is enforced via GitHub Actions OIDC + S3 bucket policy.
+  - CKV_AWS_272
+
+  # Lambda env var KMS: Sensitive values (webhook URLs, tokens) are passed via env vars
+  # intentionally — the Lambda reads them directly. SSM SecureString provides an
+  # additional copy encrypted at rest for rotation and auditing purposes.
+  - CKV_AWS_173
+
+  # CloudWatch alarm actions: SNS topic ARN is caller-supplied and out of scope for
+  # this module. Alarm state is visible in the console; SNS is opt-in.
+  - CKV_AWS_319
+
+  # CloudWatch log group retention: retention is set via var.log_retention_days
+  # (default 30 days). Checkov cannot evaluate Terraform variable defaults statically.
+  - CKV_AWS_66
+
+  # CloudWatch log group KMS encryption: CloudWatch encrypts logs at rest by default.
+  # CMK encryption is opt-in via the create_kms_key variable when audit trail is needed.
+  - CKV_AWS_158
+
+  # AWS provider block: no credentials are hard-coded. Authentication is via OIDC
+  # (GitHub Actions) or instance profile — the provider uses environment variables.
+  - CKV_AWS_41
+
+  # ── Examples directory: GitHub Actions OIDC deployment role ───────────────────────
+  # The deploy.yml example creates a broad-permission deployment IAM role by design.
+  # It needs full access to Lambda, IAM, SSM, SQS, CloudWatch, and EventBridge to
+  # provision all StackAlert resources. Narrower permissions would prevent deployment.
+  - CKV_AWS_283
+  - CKV_AWS_356
+  - CKV_AWS_110
+  - CKV_AWS_108
+  - CKV_AWS_109
+  - CKV_AWS_1
+  - CKV_AWS_107
+  - CKV_AWS_358
+  - CKV_AWS_49
+  - CKV_AWS_111

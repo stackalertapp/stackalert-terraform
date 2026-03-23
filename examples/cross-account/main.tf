@@ -34,12 +34,7 @@ provider "aws" {
 #     Statement = [{
 #       Effect    = "Allow"
 #       Action    = "sts:AssumeRole"
-#       Principal = { AWS = "arn:aws:iam::${var.monitoring_account_id}:root" }
-#       Condition = {
-#         StringEquals = {
-#           "sts:ExternalId" = var.external_id
-#         }
-#       }
+#       Principal = { AWS = "arn:aws:iam::MONITORING_ACCOUNT_ID:root" }
 #     }]
 #   })
 # }
@@ -64,6 +59,8 @@ module "stackalert" {
   aws_region             = var.aws_region
   artifact_s3_bucket     = var.artifact_s3_bucket
   artifact_s3_key        = var.artifact_s3_key
+  notification_channels  = var.notification_channels
+  slack_webhook_url      = var.slack_webhook_url
   telegram_chat_id       = var.telegram_chat_id
   telegram_bot_token     = var.telegram_bot_token
   cross_account_role_arn = var.cross_account_role_arn
@@ -72,27 +69,43 @@ module "stackalert" {
 }
 
 variable "aws_region" {
+  type    = string
   default = "eu-central-1"
 }
 
-variable "monitoring_account_id" {
-  description = "AWS account ID where StackAlert Lambda runs."
+variable "artifact_s3_bucket" {
+  type = string
 }
 
-variable "artifact_s3_bucket" {}
 variable "artifact_s3_key" {
+  type    = string
   default = "stackalert-lambda/latest.zip"
 }
+
+variable "notification_channels" {
+  type    = string
+  default = "slack"
+}
+
+variable "slack_webhook_url" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
 variable "telegram_chat_id" {
+  type      = string
   sensitive = true
+  default   = ""
 }
+
 variable "telegram_bot_token" {
+  type      = string
   sensitive = true
+  default   = ""
 }
+
 variable "cross_account_role_arn" {
+  type        = string
   description = "ARN of the IAM role in the target account. Example: arn:aws:iam::TARGET_ACCOUNT_ID:role/stackalert-cost-reader"
-}
-variable "external_id" {
-  description = "External ID for cross-account STS trust (security best practice)."
-  default     = "stackalert"
 }

@@ -18,7 +18,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 resource "aws_iam_role" "stackalert" {
   name               = "stackalert-lambda-${var.environment}"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-  description        = "Execution role for StackAlert Lambda — AWS cost spike detector"
+  description        = "Execution role for StackAlert Lambda - AWS cost spike detector"
 
   tags = local.common_tags
 }
@@ -127,6 +127,28 @@ resource "aws_iam_role_policy" "lambda_dlq" {
   name   = "sqs-dlq-send"
   role   = aws_iam_role.stackalert.id
   policy = data.aws_iam_policy_document.lambda_dlq.json
+}
+
+# ============================================================
+# X-Ray: allow Lambda to send trace data (active tracing)
+# ============================================================
+
+data "aws_iam_policy_document" "lambda_xray" {
+  statement {
+    sid    = "AllowXRayTracing"
+    effect = "Allow"
+    actions = [
+      "xray:PutTraceSegments",
+      "xray:PutTelemetryRecords",
+    ]
+    resources = ["*"] # X-Ray does not support resource-level permissions
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_xray" {
+  name   = "xray-tracing"
+  role   = aws_iam_role.stackalert.id
+  policy = data.aws_iam_policy_document.lambda_xray.json
 }
 
 # ============================================================

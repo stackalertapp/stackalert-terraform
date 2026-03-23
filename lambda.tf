@@ -24,6 +24,11 @@ resource "aws_lambda_function" "stackalert" {
   # Prevent runaway invocations — StackAlert only needs 1 concurrent execution at a time
   reserved_concurrent_executions = 2
 
+  # Active X-Ray tracing for distributed request tracing (CKV_AWS_50)
+  tracing_config {
+    mode = "Active"
+  }
+
   logging_config {
     log_format = "JSON"
     log_group  = aws_cloudwatch_log_group.stackalert.name
