@@ -1,0 +1,6 @@
+aws_region          = "eu-central-1"
+artifact_s3_bucket  = "my-stackalert-artifacts"
+artifact_s3_key     = "stackalert-lambda/latest.zip"
+telegram_chat_id    = "-1001234567890"
+telegram_bot_token  = "1234567890:AAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+spike_threshold_pct = 50
