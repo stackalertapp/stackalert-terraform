@@ -1,0 +1,19 @@
+# tfsec configuration — managed false-positive exceptions
+# Each ignore is documented with a rationale.
+
+ignore:
+  # aws-cloudwatch-log-group-customer-key
+  # Rationale: KMS encryption for CloudWatch log groups is overkill for this use case.
+  # StackAlert logs contain cost metrics and alert statuses — no PII or secrets are written
+  # to CloudWatch. The default AWS-managed encryption at rest is sufficient. Adding a
+  # customer-managed KMS key would introduce operational overhead (key rotation, cross-account
+  # key policies) without a meaningful security benefit for this workload.
+  - aws-cloudwatch-log-group-customer-key
+
+  # aws-lambda-enable-tracing
+  # Rationale: X-Ray tracing is optional for this workload. StackAlert is a lightweight
+  # scheduled Lambda running on a fixed schedule with deterministic inputs. Distributed
+  # tracing adds cost and complexity that is not justified for a single-function architecture.
+  # CloudWatch Logs with structured JSON output (already configured) provides sufficient
+  # observability for debugging and operational monitoring.
+  - aws-lambda-enable-tracing

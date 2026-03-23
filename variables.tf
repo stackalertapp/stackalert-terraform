@@ -2,6 +2,11 @@ variable "aws_region" {
   description = "AWS region for StackAlert resources (Lambda, SSM, CloudWatch logs)."
   type        = string
   default     = "eu-central-1"
+
+  validation {
+    condition     = can(regex("^[a-z]{2}-[a-z]+-[0-9]$", var.aws_region))
+    error_message = "aws_region must be a valid AWS region format (e.g. eu-central-1, us-east-1)."
+  }
 }
 
 variable "artifact_s3_bucket" {
@@ -33,8 +38,8 @@ variable "spike_threshold_pct" {
   default     = 50
 
   validation {
-    condition     = var.spike_threshold_pct > 0 && var.spike_threshold_pct <= 1000
-    error_message = "spike_threshold_pct must be between 1 and 1000."
+    condition     = var.spike_threshold_pct >= 1 && var.spike_threshold_pct <= 500
+    error_message = "spike_threshold_pct must be between 1 and 500."
   }
 }
 
