@@ -184,6 +184,68 @@ resource "aws_iam_role_policy" "lambda_sts" {
 }
 
 # ============================================================
+# DynamoDB: allow Lambda to scan the accounts table
+# Only created when create_step_function = true
+# ============================================================
+
+data "aws_iam_policy_document" "lambda_dynamodb" {
+  count = var.create_step_function ? 1 : 0
+
+  statement {
+    sid    = "AllowAccountsTableScan"
+    effect = "Allow"
+    actions = [
+      "dynamodb:Scan",
+    ]
+    resources = [
+      "arn:aws:dynamodb:${local.dynamodb_region}:${data.aws_caller_identity.current.account_id}:table/${var.dynamodb_table_name}",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_dynamodb" {
+  count  = var.create_step_function ? 1 : 0
+  name   = "dynamodb-accounts-scan"
+  role   = aws_iam_role.stackalert.id
+  policy = data.aws_iam_policy_document.lambda_dynamodb[0].json
+}
+
+# ============================================================
+# STS: multi-account role assumption
+#
+# In single-account / open-source mode (create_step_function = false),
+# the existing `lambda_sts` policy (gated on cross_account_role_arn)
+# handles the optional single cross-account role.
+#
+# In multi-account mode (create_step_function = true), the Lambda
+# must assume arbitrary customer-provided roles stored in DynamoDB.
+# The permission is scoped to the specific role name created by
+# the StackAlert CloudFormation template — prevents over-broad access.
+# ============================================================
+
+data "aws_iam_policy_document" "lambda_sts_multi" {
+  count = var.create_step_function ? 1 : 0
+
+  statement {
+    sid    = "AllowMultiAccountRoleAssumption"
+    effect = "Allow"
+    actions = [
+      "sts:AssumeRole",
+    ]
+    # Scoped to the StackAlertCostMonitor role created by the CF template.
+    # Customers who use a custom RoleName parameter will need to adjust this.
+    resources = ["arn:aws:iam::*:role/StackAlertCostMonitor*"]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_sts_multi" {
+  count  = var.create_step_function ? 1 : 0
+  name   = "sts-multi-account"
+  role   = aws_iam_role.stackalert.id
+  policy = data.aws_iam_policy_document.lambda_sts_multi[0].json
+}
+
+# ============================================================
 # Data sources: current AWS account and region
 # ============================================================
 

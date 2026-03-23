@@ -71,3 +71,23 @@ output "lambda_error_alarm_arn" {
   description = "ARN of the CloudWatch alarm for Lambda errors — use for SNS/PagerDuty integration."
   value       = aws_cloudwatch_metric_alarm.lambda_errors.arn
 }
+
+output "step_function_arn" {
+  description = "ARN of the Step Functions state machine (multi-account mode). Empty string when create_step_function = false."
+  value       = length(aws_sfn_state_machine.stackalert) > 0 ? aws_sfn_state_machine.stackalert[0].arn : ""
+}
+
+output "step_function_name" {
+  description = "Name of the Step Functions state machine (multi-account mode). Empty string when create_step_function = false."
+  value       = length(aws_sfn_state_machine.stackalert) > 0 ? aws_sfn_state_machine.stackalert[0].name : ""
+}
+
+output "invoke_command_multi_spike" {
+  description = "AWS CLI command to manually trigger a multi-account spike check via Step Functions."
+  value       = length(aws_sfn_state_machine.stackalert) > 0 ? "aws stepfunctions start-execution --state-machine-arn ${aws_sfn_state_machine.stackalert[0].arn} --input '{\"mode\":\"spike\"}'" : ""
+}
+
+output "invoke_command_multi_digest" {
+  description = "AWS CLI command to manually trigger a multi-account daily digest via Step Functions."
+  value       = length(aws_sfn_state_machine.stackalert) > 0 ? "aws stepfunctions start-execution --state-machine-arn ${aws_sfn_state_machine.stackalert[0].arn} --input '{\"mode\":\"digest\"}'" : ""
+}

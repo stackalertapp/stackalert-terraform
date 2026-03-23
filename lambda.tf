@@ -21,8 +21,10 @@ resource "aws_lambda_function" "stackalert" {
   memory_size = var.lambda_memory_mb
   timeout     = var.lambda_timeout_seconds
 
-  # Prevent runaway invocations — StackAlert only needs 1 concurrent execution at a time
-  reserved_concurrent_executions = 2
+  # Single-account: cap at 2 (one active + one retry).
+  # Multi-account (SF mode): allow up to max_concurrency + 1
+  #   (+1 for the list_accounts invocation that runs before the Map).
+  reserved_concurrent_executions = var.create_step_function ? var.step_function_max_concurrency + 1 : 2
 
   # Active X-Ray tracing for distributed request tracing (CKV_AWS_50)
   tracing_config {
@@ -39,21 +41,29 @@ resource "aws_lambda_function" "stackalert" {
   }
 
   environment {
-    variables = {
-      # Which channels to fan-out to (comma-separated: slack, telegram, pagerduty)
-      NOTIFICATION_CHANNELS = var.notification_channels
+    variables = merge(
+      {
+        # Which channels to fan-out to (comma-separated: slack, telegram, pagerduty)
+        NOTIFICATION_CHANNELS = var.notification_channels
 
-      # Per-channel credentials — only the channels listed above are used by the Lambda
-      SLACK_WEBHOOK_URL     = var.slack_webhook_url
-      TELEGRAM_BOT_TOKEN    = var.telegram_bot_token
-      TELEGRAM_CHAT_ID      = var.telegram_chat_id
-      PAGERDUTY_ROUTING_KEY = var.pagerduty_routing_key
+        # Per-channel credentials — only the channels listed above are used by the Lambda
+        SLACK_WEBHOOK_URL     = var.slack_webhook_url
+        TELEGRAM_BOT_TOKEN    = var.telegram_bot_token
+        TELEGRAM_CHAT_ID      = var.telegram_chat_id
+        PAGERDUTY_ROUTING_KEY = var.pagerduty_routing_key
 
-      SPIKE_THRESHOLD_PCT    = tostring(var.spike_threshold_pct)
-      CROSS_ACCOUNT_ROLE_ARN = var.cross_account_role_arn
-      RUST_LOG               = "stackalert_lambda=info,aws_sdk=warn"
-      DLQ_URL                = aws_sqs_queue.dlq.url
-    }
+        SPIKE_THRESHOLD_PCT    = tostring(var.spike_threshold_pct)
+        CROSS_ACCOUNT_ROLE_ARN = var.cross_account_role_arn
+        RUST_LOG               = "stackalert_lambda=info,aws_sdk=warn"
+        DLQ_URL                = aws_sqs_queue.dlq.url
+      },
+      # Multi-account mode: pass DynamoDB config so the Lambda knows where
+      # to load the accounts list from.
+      var.create_step_function ? {
+        DYNAMODB_TABLE  = var.dynamodb_table_name
+        DYNAMODB_REGION = local.dynamodb_region
+      } : {}
+    )
   }
 
   tags = local.common_tags
@@ -69,9 +79,13 @@ resource "aws_lambda_function" "stackalert" {
 
 # ============================================================
 # Lambda permissions: allow EventBridge to invoke the function
+# Only needed in single-account mode — in multi-account mode,
+# EventBridge triggers Step Functions which then calls Lambda
+# (that permission lives in step_functions.tf).
 # ============================================================
 
 resource "aws_lambda_permission" "eventbridge_spike" {
+  count         = var.create_step_function ? 0 : 1
   statement_id  = "AllowEventBridgeSpikeCheck"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.stackalert.function_name
@@ -80,6 +94,7 @@ resource "aws_lambda_permission" "eventbridge_spike" {
 }
 
 resource "aws_lambda_permission" "eventbridge_digest" {
+  count         = var.create_step_function ? 0 : 1
   statement_id  = "AllowEventBridgeDailyDigest"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.stackalert.function_name
