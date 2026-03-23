@@ -104,3 +104,15 @@ variable "environment" {
     error_message = "environment must be one of: dev, staging, prod."
   }
 }
+
+variable "tags" {
+  description = "Additional tags to apply to all resources."
+  type        = map(string)
+  default     = {}
+}
+
+variable "create_kms_key" {
+  description = "When true, creates a dedicated customer-managed KMS key for SSM parameter encryption. When false (default), uses the AWS managed key (alias/aws/ssm)."
+  type        = bool
+  default     = false
+}

@@ -8,9 +8,7 @@ resource "aws_cloudwatch_event_rule" "spike_check" {
   description         = "Triggers StackAlert spike detection every 6 hours"
   schedule_expression = var.spike_schedule
 
-  tags = {
-    Name = "stackalert-spike-check-${var.environment}"
-  }
+  tags = local.common_tags
 }
 
 resource "aws_cloudwatch_event_target" "spike_check" {
@@ -28,9 +26,7 @@ resource "aws_cloudwatch_event_rule" "daily_digest" {
   description         = "Triggers StackAlert daily cost digest at 08:00 UTC"
   schedule_expression = var.digest_schedule
 
-  tags = {
-    Name = "stackalert-daily-digest-${var.environment}"
-  }
+  tags = local.common_tags
 }
 
 resource "aws_cloudwatch_event_target" "daily_digest" {

@@ -20,13 +20,12 @@ resource "aws_iam_role" "stackalert" {
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
   description        = "Execution role for StackAlert Lambda — AWS cost spike detector"
 
-  tags = {
-    Name = "stackalert-lambda-${var.environment}"
-  }
+  tags = local.common_tags
 }
 
 # ============================================================
 # CloudWatch Logs: allow Lambda to write structured logs
+# Scoped to the specific log group ARN — no wildcard accounts/regions
 # ============================================================
 
 data "aws_iam_policy_document" "lambda_logs" {
@@ -38,7 +37,7 @@ data "aws_iam_policy_document" "lambda_logs" {
       "logs:PutLogEvents",
     ]
     resources = [
-      "${aws_cloudwatch_log_group.stackalert.arn}:*",
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/stackalert-${var.environment}:*",
     ]
   }
 }
@@ -105,6 +104,27 @@ resource "aws_iam_role_policy" "lambda_cost_explorer" {
 }
 
 # ============================================================
+# SQS DLQ: allow Lambda to send failed invocations to the DLQ
+# ============================================================
+
+data "aws_iam_policy_document" "lambda_dlq" {
+  statement {
+    sid    = "AllowDLQSendMessage"
+    effect = "Allow"
+    actions = [
+      "sqs:SendMessage",
+    ]
+    resources = [aws_sqs_queue.dlq.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_dlq" {
+  name   = "sqs-dlq-send"
+  role   = aws_iam_role.stackalert.id
+  policy = data.aws_iam_policy_document.lambda_dlq.json
+}
+
+# ============================================================
 # STS: allow Lambda to assume cross-account role (optional)
 # ============================================================
 
@@ -129,8 +149,8 @@ resource "aws_iam_role_policy" "lambda_sts" {
 }
 
 # ============================================================
-# S3: allow Lambda to read its own artifact bucket (optional)
-# for self-update patterns — skip if not needed
+# Data sources: current AWS account and region
 # ============================================================
 
 data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
