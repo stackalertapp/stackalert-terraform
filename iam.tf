@@ -12,6 +12,14 @@ data "aws_iam_policy_document" "lambda_assume_role" {
       type        = "Service"
       identifiers = ["lambda.amazonaws.com"]
     }
+
+    # Confused-deputy protection: only Lambda invoked FROM this account can assume the role.
+    # Without this a Lambda in another account could potentially assume it via the service principal.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
   }
 }
 

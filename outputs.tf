@@ -13,9 +13,18 @@ output "lambda_role_arn" {
   value       = aws_iam_role.stackalert.arn
 }
 
-output "ssm_parameter_name" {
-  description = "SSM parameter name for the Telegram bot token."
-  value       = aws_ssm_parameter.telegram_bot_token.name
+output "ssm_parameter_paths" {
+  description = "SSM parameter paths created for the enabled notification channels."
+  value = compact([
+    length(aws_ssm_parameter.telegram_bot_token) > 0 ? aws_ssm_parameter.telegram_bot_token[0].name : "",
+    length(aws_ssm_parameter.slack_webhook_url) > 0 ? aws_ssm_parameter.slack_webhook_url[0].name : "",
+    length(aws_ssm_parameter.pagerduty_routing_key) > 0 ? aws_ssm_parameter.pagerduty_routing_key[0].name : "",
+  ])
+}
+
+output "deploy_role_arn" {
+  description = "ARN of the GitHub Actions OIDC deployment role. Empty string when create_deploy_role = false."
+  value       = length(aws_iam_role.deploy) > 0 ? aws_iam_role.deploy[0].arn : ""
 }
 
 output "log_group_name" {

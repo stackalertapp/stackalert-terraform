@@ -145,3 +145,21 @@ variable "create_kms_key" {
   type        = bool
   default     = false
 }
+
+variable "create_deploy_role" {
+  description = "When true, creates a least-privilege GitHub Actions OIDC deployment role scoped to stackalert-* resources. Requires the GitHub OIDC provider to already exist in the account and github_org + github_repo to be set."
+  type        = bool
+  default     = false
+}
+
+variable "github_org" {
+  description = "GitHub organisation or username that owns the repository. Required when create_deploy_role = true."
+  type        = string
+  default     = ""
+}
+
+variable "github_repo" {
+  description = "GitHub repository name (without the org prefix). Required when create_deploy_role = true."
+  type        = string
+  default     = ""
+}
