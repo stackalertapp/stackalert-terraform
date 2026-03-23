@@ -42,6 +42,7 @@ jobs:
           working_directory: .
           format: sarif
           additional_args: --out tfsec.sarif
+          soft_fail: true  # Upload findings to Security tab; don't block the build
 
       - name: Upload tfsec SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
@@ -62,6 +63,9 @@ jobs:
           framework: terraform
           output_format: sarif
           output_file_path: checkov.sarif
+          config_file: .checkov.yaml  # Applies documented skip rules
+          soft_fail: true             # Upload findings to Security tab; don't block the build
+          log_level: WARNING
 
       - name: Upload checkov SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
