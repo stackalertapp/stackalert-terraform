@@ -1,5 +1,9 @@
 # stackalert-terraform
 
+[![Validate](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/validate.yml/badge.svg)](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/validate.yml)
+[![Security](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/security.yml/badge.svg)](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/security.yml)
+[![Deploy](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/deploy.yml/badge.svg)](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/deploy.yml)
+
 Terraform infrastructure for [StackAlert](https://github.com/stackalertapp/stackalert-lambda) — AWS cost spike detection with alerts via **Slack**, **Telegram**, and/or **PagerDuty**.
 
 ## Resources Created
