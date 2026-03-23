@@ -163,32 +163,3 @@ variable "github_repo" {
   type        = string
   default     = ""
 }
-
-variable "create_step_function" {
-  description = "When true, creates an AWS Step Functions state machine for multi-account fan-out. EventBridge targets the state machine instead of Lambda directly. Requires a DynamoDB table with connected account records."
-  type        = bool
-  default     = false
-}
-
-variable "dynamodb_table_name" {
-  description = "DynamoDB table name containing connected account records (written by the StackAlert dashboard). Required when create_step_function = true."
-  type        = string
-  default     = "stackalert"
-}
-
-variable "dynamodb_region" {
-  description = "AWS region of the DynamoDB accounts table. Defaults to var.aws_region when left empty."
-  type        = string
-  default     = ""
-}
-
-variable "step_function_max_concurrency" {
-  description = "Maximum number of customer accounts checked concurrently by the Step Functions Map state. Tune based on Lambda concurrency quota."
-  type        = number
-  default     = 10
-
-  validation {
-    condition     = var.step_function_max_concurrency >= 1 && var.step_function_max_concurrency <= 40
-    error_message = "step_function_max_concurrency must be between 1 and 40."
-  }
-}
