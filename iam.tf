@@ -83,8 +83,8 @@ data "aws_iam_policy_document" "lambda_ssm" {
     actions = [
       "kms:Decrypt",
     ]
-    # Allow decrypt of the default SSM key (aws/ssm)
-    resources = ["arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alias/aws/ssm"]
+    # Allow decrypt of the default SSM key (aws/ssm) — uses data source for consistency
+    resources = ["arn:aws:kms:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alias/aws/ssm"]
   }
 }
 
@@ -92,6 +92,32 @@ resource "aws_iam_role_policy" "lambda_ssm" {
   name   = "ssm-read-channel-secrets"
   role   = aws_iam_role.stackalert.id
   policy = data.aws_iam_policy_document.lambda_ssm.json
+}
+
+# ============================================================
+# SSM: allow Lambda to read/write dedup timestamps
+# Scoped to /stackalert/{env}/dedup/* — used to prevent
+# duplicate alerts within the cooldown window.
+# ============================================================
+
+data "aws_iam_policy_document" "lambda_ssm_dedup" {
+  statement {
+    sid    = "AllowSSMDedupReadWrite"
+    effect = "Allow"
+    actions = [
+      "ssm:GetParameter",
+      "ssm:PutParameter",
+    ]
+    resources = [
+      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/stackalert/${var.environment}/dedup/*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_ssm_dedup" {
+  name   = "ssm-dedup-readwrite"
+  role   = aws_iam_role.stackalert.id
+  policy = data.aws_iam_policy_document.lambda_ssm_dedup.json
 }
 
 # ============================================================

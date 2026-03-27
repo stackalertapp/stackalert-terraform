@@ -62,11 +62,6 @@ output "dlq_arn" {
   value       = aws_sqs_queue.dlq.arn
 }
 
-output "cloudwatch_log_group_name" {
-  description = "CloudWatch log group name for Lambda logs (alias for log_group_name)."
-  value       = aws_cloudwatch_log_group.stackalert.name
-}
-
 output "lambda_error_alarm_arn" {
   description = "ARN of the CloudWatch alarm for Lambda errors — use for SNS/PagerDuty integration."
   value       = aws_cloudwatch_metric_alarm.lambda_errors.arn

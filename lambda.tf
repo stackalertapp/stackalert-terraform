@@ -58,12 +58,16 @@ resource "aws_lambda_function" "stackalert" {
 
   tags = local.common_tags
 
+  # Explicit depends_on for IAM policies that are NOT directly referenced in this resource.
+  # Ensures all permissions are attached before Lambda is created (IAM is eventually consistent).
+  # Note: log group and DLQ are implicit deps via logging_config and dead_letter_config above.
   depends_on = [
     aws_iam_role_policy.lambda_logs,
     aws_iam_role_policy.lambda_ssm,
+    aws_iam_role_policy.lambda_ssm_dedup,
     aws_iam_role_policy.lambda_cost_explorer,
     aws_iam_role_policy.lambda_dlq,
-    aws_cloudwatch_log_group.stackalert,
+    aws_iam_role_policy.lambda_xray,
   ]
 }
 

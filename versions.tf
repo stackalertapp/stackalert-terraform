@@ -23,10 +23,9 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "stackalert"
-      ManagedBy   = "terraform"
-      Repository  = "stackalertapp/stackalert-terraform"
+      Project    = "stackalert"
+      ManagedBy  = "terraform"
+      Repository = "stackalertapp/stackalert-terraform"
     }
   }
 }
-

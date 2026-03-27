@@ -17,7 +17,7 @@ permissions:
 
 env:
   TF_VAR_environment: ${{ github.event.inputs.environment || 'prod' }}
-  TF_VAR_artifact_s3_bucket: ${{ vars.ARTIFACT_S3_BUCKET }}
+  TF_VAR_artifact_s3_bucket: ${{ vars.ARTIFACT_S3_BUCKET || 'placeholder-bucket' }}
   TF_VAR_notification_channels: ${{ vars.NOTIFICATION_CHANNELS || 'slack' }}
   TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
   TF_VAR_telegram_chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -26,9 +26,40 @@ env:
   TF_VAR_cross_account_role_arn: ${{ vars.CROSS_ACCOUNT_ROLE_ARN }}
 
 jobs:
+  # ── Check whether deploy secrets / vars are configured ──────────────────────
+  check-config:
+    name: Check Deploy Config
+    runs-on: ubuntu-latest
+    outputs:
+      # Outputs 'true' only if the AWS_DEPLOY_ROLE_ARN secret is non-empty.
+      # Using a helper job + env var avoids the GitHub Actions limitation where
+      # secrets can't be referenced directly in job-level `if` expressions.
+      can-deploy: ${{ steps.check.outputs.can-deploy }}
+    steps:
+      - id: check
+        env:
+          DEPLOY_ROLE: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -n "$DEPLOY_ROLE" ]; then
+            echo "can-deploy=true" >> "$GITHUB_OUTPUT"
+            echo "✅ AWS credentials configured — deploy will proceed."
+          else
+            echo "can-deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Deploy skipped::AWS_DEPLOY_ROLE_ARN secret is not set."
+            echo "Configure the following to enable automated deployments:"
+            echo "  Secrets: AWS_DEPLOY_ROLE_ARN"
+            echo "  Variables: AWS_REGION, ARTIFACT_S3_BUCKET"
+          fi
+
+  # ── Terraform Plan (only when AWS credentials are configured) ─────────────
   plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
+    needs: check-config
+    if: |
+      needs.check-config.outputs.can-deploy == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request'
     outputs:
       plan-exitcode: ${{ steps.plan.outputs.exitcode }}
     steps:
@@ -64,6 +95,7 @@ jobs:
         if: steps.plan.outputs.exitcode == '1'
         run: exit 1
 
+  # ── Terraform Apply (only when plan detected changes) ────────────────────
   apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
@@ -98,6 +130,7 @@ jobs:
       - name: Output Lambda invoke commands
         run: terraform output -json | jq -r 'to_entries[] | "\(.key): \(.value.value)"'
 
+  # ── Smoke Test (only after successful apply) ──────────────────────────────
   smoke-test:
     name: Smoke Test (spike check)
     runs-on: ubuntu-latest
