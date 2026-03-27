@@ -56,10 +56,7 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
     needs: check-config
-    if: |
-      needs.check-config.outputs.can-deploy == 'true' &&
-      github.ref == 'refs/heads/main' &&
-      github.event_name != 'pull_request'
+    if: needs.check-config.outputs.can-deploy == 'true'
     outputs:
       plan-exitcode: ${{ steps.plan.outputs.exitcode }}
     steps:
