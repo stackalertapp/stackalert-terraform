@@ -112,6 +112,10 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
+      - name: Output Lambda invoke commands
+        run: |
+          terraform output -json | jq -r 'to_entries[] | (.key + ": " + (.value.value | tostring))'
+
   smoke-test:
     name: Smoke Test (spike check)
     runs-on: ubuntu-latest
