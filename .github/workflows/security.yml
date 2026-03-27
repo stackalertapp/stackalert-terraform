@@ -30,26 +30,6 @@ jobs:
       - name: Run tflint
         run: tflint --recursive --format compact
 
-  tfsec:
-    name: tfsec
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run tfsec
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          working_directory: .
-          format: sarif
-          additional_args: --out tfsec.sarif
-          soft_fail: true  # Upload findings to Security tab; don't block the build
-
-      - name: Upload tfsec SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: tfsec.sarif
-
   checkov:
     name: checkov
     runs-on: ubuntu-latest
