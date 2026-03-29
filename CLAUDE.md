@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Terraform module that deploys **StackAlert** — a serverless AWS cost spike detection and alerting system. A Rust Lambda (arm64, `provided.al2023`) runs on EventBridge schedules to monitor AWS costs via Cost Explorer and sends alerts through 7 notification channels.us
+Terraform module that deploys **StackAlert** — a serverless AWS cost spike detection and alerting system. A Rust Lambda (arm64, `provided.al2023`) runs on EventBridge schedules to monitor AWS costs via Cost Explorer and sends alerts through 7 notification channels.
 
 Repository: `stackalertapp/stackalert-terraform`
 License: Apache 2.0
@@ -22,31 +22,74 @@ EventBridge (every 6h / daily 8am UTC)
 
 **Secret handling**: Secrets (webhook URLs, tokens, routing keys) are stored in SSM SecureString. Lambda receives SSM parameter **paths** via env vars (e.g. `SLACK_WEBHOOK_URL_SSM_PARAM`) and reads the actual values at runtime. Non-secret config (chat IDs, email addresses, severity levels) are passed as plain env vars.
 
+## Quick Start
+
+```bash
+# 1. Download the Lambda artifact
+./scripts/download-lambda.sh examples/telegram
+
+# 2. Configure
+cd examples/telegram
+cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars with your Telegram bot token and chat ID
+
+# 3. Deploy
+terraform init
+terraform apply
+```
+
+## Lambda Artifact
+
+The module supports two ways to provide the Lambda deployment package:
+
+| Method | Variable | Use case |
+|--------|----------|----------|
+| **Local file** | `lambda_filename` | Local dev, quick start — no S3 bucket needed |
+| **S3 bucket** | `artifact_s3_bucket` + `artifact_s3_key` | CI/CD, teams, production deployments |
+
+**Helper script** (`scripts/download-lambda.sh`):
+```bash
+# Download latest release to current directory
+./scripts/download-lambda.sh
+
+# Download latest to a specific directory
+./scripts/download-lambda.sh examples/telegram
+
+# Download a specific version
+./scripts/download-lambda.sh . v1.0.1
+```
+
+The script resolves the latest tag from the GitHub API before downloading.
+
 ## Module Layout
 
-| File                 | Purpose                                                    |
-|----------------------|------------------------------------------------------------|
-| `versions.tf`        | Terraform >= 1.10, AWS provider ~> 5.91, S3 backend (commented) |
-| `variables.tf`       | 35+ inputs: region, channels, thresholds, secrets, Lambda config |
-| `outputs.tf`         | Lambda ARN/name, SSM paths, DLQ, EventBridge rules, CLI invoke commands |
-| `locals.tf`          | Tag merging, channel set parsing from comma-separated `notify_channels` |
-| `lambda.tf`          | Lambda function (S3 artifact), conditional env vars per channel, EventBridge permissions |
-| `iam.tf`             | Least-privilege execution role with conditional policies (SES, SNS, STS) |
-| `iam_deploy_role.tf` | Optional GitHub Actions OIDC deployment role               |
-| `ssm.tf`             | Conditional SSM SecureString params per enabled channel + optional KMS CMK |
-| `eventbridge.tf`     | Spike check (rate) + daily digest (cron) rules             |
-| `cloudwatch.tf`      | Log group + 3 alarms (errors, throttles, DLQ depth)       |
-| `sqs.tf`             | Dead Letter Queue (14-day retention, SSE-SQS)             |
+| File                  | Purpose                                                    |
+|-----------------------|------------------------------------------------------------|
+| `versions.tf`         | Terraform >= 1.10, AWS provider ~> 5.91, S3 backend (commented) |
+| `variables.tf`        | 35+ inputs: region, channels, thresholds, secrets, Lambda config |
+| `outputs.tf`          | Lambda ARN/name, SSM paths, DLQ, EventBridge rules, CLI invoke commands |
+| `locals.tf`           | Tag merging, channel set parsing from comma-separated `notify_channels` |
+| `lambda.tf`           | Lambda function (local file or S3), conditional env vars per channel, EventBridge permissions |
+| `iam.tf`              | Least-privilege execution role with conditional policies (SES, SNS, STS) |
+| `iam_deploy_role.tf`  | Optional GitHub Actions OIDC deployment role               |
+| `ssm.tf`              | Conditional SSM SecureString params per enabled channel + optional KMS CMK |
+| `eventbridge.tf`      | Spike check (rate) + daily digest (cron) rules             |
+| `cloudwatch.tf`       | Log group + 3 alarms (errors, throttles, DLQ depth)       |
+| `sqs.tf`              | Dead Letter Queue (14-day retention, SSE-SQS)             |
+| `scripts/`            | Helper scripts (download-lambda.sh)                        |
 
 ## Examples
 
-| Example           | Channel(s)         | Use case                                      |
-|-------------------|--------------------|-----------------------------------------------|
-| `single-account/` | Telegram           | Minimal setup — one account, one channel      |
-| `cross-account/`  | Slack + PagerDuty  | Multi-account via STS AssumeRole + ExternalId |
-| `multi-channel/`  | Slack + PagerDuty + SES | Fan-out to multiple channels, KMS enabled |
-| `webhook/`        | Webhook            | Generic HTTP POST with bearer auth            |
-| `sns/`            | SNS                | Publish to SNS topic (email/SMS/Lambda/SQS subscribers) |
+| Example           | Channel(s)              | Artifact   | Use case                                      |
+|-------------------|-------------------------|------------|-----------------------------------------------|
+| `telegram/`       | Telegram                | Local file | Quick start with Telegram bot                 |
+| `single-account/` | Telegram                | S3         | Single-account setup via S3 artifact          |
+| `cross-account/`  | Slack + PagerDuty       | S3         | Multi-account via STS AssumeRole + ExternalId |
+| `multi-channel/`  | Slack + PagerDuty + SES | S3         | Fan-out to multiple channels, KMS enabled     |
+| `webhook/`        | Webhook                 | S3         | Generic HTTP POST with bearer auth            |
+| `sns/`            | SNS                     | S3         | Publish to SNS topic (email/SMS/Lambda/SQS)   |
+
+Each example includes a `terraform.tfvars.example` file — copy to `terraform.tfvars` and fill in your values.
 
 ## Development Commands
 
@@ -85,10 +128,13 @@ docker run --rm -v "$(pwd):/terraform-docs" -u "$(id -u)" \
 | `deploy.yml`    | Push to main / manual | OIDC auth, plan, apply, smoke test            |
 | `docs.yml`      | PR to main         | Auto-generates README via terraform-docs        |
 
+All third-party GitHub Actions are pinned to commit SHAs for supply chain security.
+
 ## Terraform Conventions
 
 - **Naming**: All resources use `stackalert-${var.environment}` prefix
-- **Tags**: Common tags applied via `default_tags` in provider + `local.common_tags`
+- **Tags**: Common tags applied via `default_tags` in the calling root module's provider + `local.common_tags`
+- **No provider block in the module**: The module inherits the provider from the caller (see `examples/` for provider config with `default_tags`)
 - **Channel activation**: `notify_channels` is a comma-separated string parsed into a set in `locals.tf`:
   ```hcl
   channels = toset([for c in split(",", var.notify_channels) : trimspace(c)])
@@ -98,6 +144,7 @@ docker run --rm -v "$(pwd):/terraform-docs" -u "$(id -u)" \
   count = contains(local.channels, "slack") ? 1 : 0
   ```
 - **Lambda env vars**: Built with `merge()` of conditional maps — each channel block adds its env vars only when enabled
+- **Lambda artifact**: Uses `filename` when `lambda_filename` is set, falls back to `s3_bucket`/`s3_key` otherwise
 - **IAM**: Each policy is a separate `aws_iam_role_policy` resource scoped to specific actions/resources
 - **Depends-on**: Lambda explicitly depends on all IAM policy attachments (IAM eventual consistency)
 - **Sensitive variables**: Marked `sensitive = true` in `variables.tf`, stored in SSM SecureString, passed to Lambda as SSM param paths (not raw values)
@@ -112,6 +159,7 @@ docker run --rm -v "$(pwd):/terraform-docs" -u "$(id -u)" \
 6. **No VPC required** — Lambda calls only public AWS APIs; avoids unnecessary NAT Gateway cost
 7. **DLQ for reliability** — failed invocations captured for debugging
 8. **Static analysis** — tflint, checkov (with documented skip justifications in `.checkov.yaml`), trivy
+9. **Pinned CI actions** — all third-party GitHub Actions pinned to commit SHAs
 
 ## Checkov Skip Policy
 
@@ -128,7 +176,7 @@ All skips are documented in `.checkov.yaml` with justifications. Before adding a
 4. Add conditional IAM policy in `iam.tf` if the channel needs AWS API access (SES, SNS)
 5. Add conditional env var block in `lambda.tf` inside the `merge()` — use `*_SSM_PARAM` for secrets, plain env vars for non-secrets
 6. Add the channel name to the `notify_channels` validation in `variables.tf`
-7. Create or update an example in `examples/`
+7. Create or update an example in `examples/` with `terraform.tfvars.example`
 8. CI will auto-generate README updates via terraform-docs
 
 ## Contribution Guidelines
@@ -149,8 +197,9 @@ All skips are documented in `.checkov.yaml` with justifications. Before adding a
 
 ### What NOT to Do
 - Do not hardcode AWS credentials or account IDs
-- Do not add `*.tfvars` files to the repo (gitignored, except in `examples/`)
+- Do not add `*.tfvars` files to the repo (gitignored, except `*.tfvars.example`)
 - Do not skip checkov rules without documented justification
 - Do not pass raw secrets as Lambda env vars — always use SSM param paths
 - Do not use `terraform apply -auto-approve` in CI without a preceding plan artifact
-- Do not add provider blocks in the module root beyond `versions.tf`
+- Do not add provider blocks in the module — only in calling root modules / examples
+- Do not commit `lambda-arm64.zip` (gitignored)
