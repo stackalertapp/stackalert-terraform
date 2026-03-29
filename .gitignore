@@ -18,6 +18,7 @@ override.tf.json
 *_override.tf.json
 *.tfvars
 !*.tfvars.example
+lambda-arm64.zip
 
 # OS
 .DS_Store
