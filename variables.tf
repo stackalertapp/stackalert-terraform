@@ -10,14 +10,21 @@ variable "aws_region" {
 }
 
 variable "artifact_s3_bucket" {
-  description = "S3 bucket containing the pre-built Lambda ZIP artifact (built by stackalert-lambda CI)."
+  description = "S3 bucket containing the pre-built Lambda ZIP artifact. Required when lambda_filename is not set."
   type        = string
+  default     = ""
 }
 
 variable "artifact_s3_key" {
-  description = "S3 key for the Lambda ZIP artifact."
+  description = "S3 key for the Lambda ZIP artifact. Only used when artifact_s3_bucket is set."
   type        = string
   default     = "stackalert-lambda/latest.zip"
+}
+
+variable "lambda_filename" {
+  description = "Path to a local Lambda ZIP file. Alternative to S3 — download from https://github.com/stackalertapp/stackalert-lambda/releases and point here."
+  type        = string
+  default     = null
 }
 
 # ============================================================

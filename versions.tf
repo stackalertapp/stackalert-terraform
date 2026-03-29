@@ -18,14 +18,6 @@ terraform {
   # }
 }
 
-provider "aws" {
-  region = var.aws_region
-
-  default_tags {
-    tags = {
-      Project    = "stackalert"
-      ManagedBy  = "terraform"
-      Repository = "stackalertapp/stackalert-terraform"
-    }
-  }
-}
+# NOTE: Do not define a provider block here.
+# As a reusable module, the provider is inherited from the calling root module.
+# See examples/ for provider configuration.

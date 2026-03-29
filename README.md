@@ -17,11 +17,30 @@ Terraform infrastructure for [StackAlert](https://github.com/stackalertapp/stack
 | `aws_sqs_queue` | Dead-letter queue for failed invocations |
 | `aws_cloudwatch_log_group` | JSON-structured Lambda logs |
 
+## Quick Start
+
+```bash
+# 1. Download the Lambda artifact
+./scripts/download-lambda.sh examples/telegram
+
+# 2. Configure
+cd examples/telegram
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your Telegram bot token and chat ID
+
+# 3. Deploy
+terraform init
+terraform apply
+```
+
 ## Prerequisites
 
-1. **Build the Lambda artifact** — run the [stackalert-lambda CI](https://github.com/stackalertapp/stackalert-lambda) and upload `lambda.zip` to S3
-2. **S3 artifact bucket** — create an S3 bucket and set `ARTIFACT_S3_BUCKET` variable
-3. **GitHub OIDC** — configure AWS OIDC provider for GitHub Actions ([guide](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services))
+1. **Terraform >= 1.10** — `brew install terraform`
+2. **Lambda artifact** — either:
+   - **Local file** (quickest): `./scripts/download-lambda.sh` downloads the latest release from [stackalert-lambda](https://github.com/stackalertapp/stackalert-lambda/releases)
+   - **S3 bucket** (for CI/CD): upload the artifact to S3 and set `artifact_s3_bucket` + `artifact_s3_key`
+3. **AWS credentials** — with permissions for IAM, Lambda, SSM, SQS, EventBridge, CloudWatch, and Cost Explorer
+4. **GitHub OIDC** _(for CI/CD only)_ — configure AWS OIDC provider for GitHub Actions ([guide](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services))
 
 ## GitHub Secrets & Variables
 
@@ -39,77 +58,71 @@ Terraform infrastructure for [StackAlert](https://github.com/stackalertapp/stack
 | `WEBHOOK_URL` | Secret | Webhook URL _(if webhook enabled)_ |
 | `CROSS_ACCOUNT_ROLE_ARN` | Variable | Optional: cross-account IAM role ARN |
 
-## Usage
+## Lambda Artifact
+
+The module supports two ways to provide the Lambda deployment package:
+
+| Method | Variable | Use case |
+|--------|----------|----------|
+| **Local file** | `lambda_filename` | Local dev, quick start — no S3 bucket needed |
+| **S3 bucket** | `artifact_s3_bucket` + `artifact_s3_key` | CI/CD, teams, production deployments |
+
+### Helper script
 
 ```bash
-# Install Terraform >= 1.10
-brew install terraform
+# Download latest release to current directory
+./scripts/download-lambda.sh
 
-# Configure variables
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
+# Download to a specific directory
+./scripts/download-lambda.sh examples/telegram
 
-# Deploy
-terraform init
-terraform plan
-terraform apply
+# Download a specific version
+./scripts/download-lambda.sh . v1.0.1
 ```
 
-### terraform.tfvars.example
+### Usage with local file
 
 ```hcl
-aws_region         = "eu-central-1"
-artifact_s3_bucket = "my-stackalert-artifacts"
-artifact_s3_key    = "stackalert-lambda/latest.zip"
-environment        = "prod"
-spike_threshold_pct = 50
-
-# ── Notification channels ────────────────────────────────────
-# Enable one or more: slack, telegram, teams, pagerduty, ses, sns, webhook
-notify_channels = "telegram"
-
-# Telegram (default channel)
-telegram_bot_token = "1234567890:AAXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-telegram_chat_id   = "-1001234567890"
-
-# Slack
-# slack_webhook_url = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXX"
-
-# Microsoft Teams
-# teams_webhook_url = "https://outlook.office.com/webhook/..."
-
-# PagerDuty
-# pagerduty_routing_key = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-# pagerduty_severity    = "error"
-
-# SES (Email)
-# ses_from_address = "alerts@example.com"
-# ses_to_addresses = "team@example.com,oncall@example.com"
-
-# SNS
-# sns_topic_arn = "arn:aws:sns:eu-central-1:123456789012:stackalert-alerts"
-
-# Webhook
-# webhook_url         = "https://example.com/webhook"
-# webhook_auth_header = "Bearer my-secret-token"
-
-# ── Tuning ───────────────────────────────────────────────────
-# setup_name             = "Production"
-# history_days           = 7
-# min_avg_daily_usd      = 0.10
-# dedup_cooldown_hours   = 6
-# max_spike_display      = 5
-# max_digest_display     = 10
-# http_timeout_secs      = 10
-# http_connect_timeout_secs = 5
+module "stackalert" {
+  source          = "github.com/stackalertapp/stackalert-terraform"
+  lambda_filename = "${path.module}/lambda-arm64.zip"
+  notify_channels = "telegram"
+  # ...
+}
 ```
+
+### Usage with S3
+
+```hcl
+module "stackalert" {
+  source             = "github.com/stackalertapp/stackalert-terraform"
+  artifact_s3_bucket = "my-stackalert-artifacts"
+  artifact_s3_key    = "stackalert-lambda/latest.zip"
+  notify_channels    = "telegram"
+  # ...
+}
+```
+
+## Examples
+
+| Example | Channel(s) | Artifact | Use case |
+|---------|------------|----------|----------|
+| [`telegram/`](examples/telegram/) | Telegram | Local file | Quick start with Telegram bot |
+| [`single-account/`](examples/single-account/) | Telegram | S3 | Single-account setup via S3 artifact |
+| [`cross-account/`](examples/cross-account/) | Slack + PagerDuty | S3 | Multi-account via STS AssumeRole |
+| [`multi-channel/`](examples/multi-channel/) | Slack + PagerDuty + SES | S3 | Fan-out to multiple channels, KMS |
+| [`webhook/`](examples/webhook/) | Webhook | S3 | Generic HTTP POST with bearer auth |
+| [`sns/`](examples/sns/) | SNS | S3 | Publish to SNS topic |
+
+Each example includes a `terraform.tfvars.example` — copy to `terraform.tfvars` and fill in your values.
 
 ## Input Variables
 
 | Variable | Type | Default | Description |
 |---|---|---|---|
 | `aws_region` | string | `eu-central-1` | AWS region for all resources |
-| `artifact_s3_bucket` | string | -- | S3 bucket with the Lambda ZIP |
+| `lambda_filename` | string | `null` | Path to a local Lambda ZIP file (alternative to S3) |
+| `artifact_s3_bucket` | string | `""` | S3 bucket with the Lambda ZIP (when not using `lambda_filename`) |
 | `artifact_s3_key` | string | `stackalert-lambda/latest.zip` | S3 key for the ZIP |
 | `environment` | string | `prod` | Deployment environment (dev/staging/prod) |
 | `notify_channels` | string | `telegram` | Comma-separated channels: `slack`, `telegram`, `teams`, `pagerduty`, `ses`, `sns`, `webhook` |
@@ -164,12 +177,14 @@ aws lambda invoke \
 ## Architecture
 
 ```
-EventBridge (every 6h)  --> Lambda --> Cost Explorer API --> Slack / Telegram / Teams
-EventBridge (daily 8am) -->        |-> (per-service breakdown) --> PagerDuty / SES
-                                                               --> SNS / Webhook
-                                   |-> SSM (channel secrets, fetched at runtime)
-                                   |-> SSM (dedup state)
-                                   |-> CloudWatch Logs + SQS DLQ
+EventBridge (every 6h / daily 8am UTC)
+  └─> Lambda (Rust, arm64)
+        ├─> Cost Explorer API (reads cost data)
+        ├─> SSM Parameter Store (read secrets via SSM param paths + dedup state)
+        ├─> Notification channels:
+        │     Slack, Telegram, Teams, PagerDuty, SES, SNS, Webhook
+        ├─> CloudWatch Logs (JSON structured)
+        └─> SQS DLQ (failed invocations)
 ```
 
 ## Multi-Channel Configuration

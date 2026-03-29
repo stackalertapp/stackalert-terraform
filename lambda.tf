@@ -8,9 +8,10 @@ resource "aws_lambda_function" "stackalert" {
   function_name = "stackalert-${var.environment}"
   description   = "StackAlert — AWS cost spike detector. Alerts via Slack, Telegram, Teams, PagerDuty, SES, SNS, and/or Webhook."
 
-  # Artifact from stackalert-lambda CI (built in GitHub Actions, uploaded to S3)
-  s3_bucket = var.artifact_s3_bucket
-  s3_key    = var.artifact_s3_key
+  # Artifact: either a local file or S3
+  filename  = var.lambda_filename
+  s3_bucket = var.lambda_filename == null ? var.artifact_s3_bucket : null
+  s3_key    = var.lambda_filename == null ? var.artifact_s3_key : null
 
   role    = aws_iam_role.stackalert.arn
   handler = "bootstrap" # Rust Lambda convention: binary named 'bootstrap'
@@ -55,14 +56,17 @@ resource "aws_lambda_function" "stackalert" {
         HTTP_TIMEOUT_SECS         = tostring(var.http_timeout_secs)
         HTTP_CONNECT_TIMEOUT_SECS = tostring(var.http_connect_timeout_secs)
 
-        # Cross-account monitoring
-        CROSS_ACCOUNT_ROLE_ARN = var.cross_account_role_arn
-        EXTERNAL_ID            = var.external_id
-
         # Logging
         RUST_LOG = "stackalert_lambda=info,aws_sdk=warn"
         DLQ_URL  = aws_sqs_queue.dlq.url
       },
+
+      # ── Cross-account (only set when configured) ──
+
+      var.cross_account_role_arn != "" ? merge(
+        { CROSS_ACCOUNT_ROLE_ARN = var.cross_account_role_arn },
+        var.external_id != "" ? { EXTERNAL_ID = var.external_id } : {},
+      ) : {},
 
       # ── Per-channel config (SSM param paths for secrets, env vars for non-secrets) ──
 
