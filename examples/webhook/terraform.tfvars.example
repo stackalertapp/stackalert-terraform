@@ -1,0 +1,12 @@
+aws_region         = "eu-central-1"
+artifact_s3_bucket = "my-stackalert-artifacts"
+artifact_s3_key    = "stackalert-lambda/latest.zip"
+
+# Any HTTP endpoint that accepts POST
+webhook_url = "https://api.example.com/alerts"
+
+# Optional — omit or leave empty if no auth needed
+webhook_auth_header = "Bearer sk-your-api-key"
+
+environment = "prod"
+setup_name  = "StackAlert Webhook"

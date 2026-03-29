@@ -2,14 +2,15 @@ aws_region         = "eu-central-1"
 artifact_s3_bucket = "my-stackalert-artifacts"
 artifact_s3_key    = "stackalert-lambda/latest.zip"
 
-# ARN of the IAM role in the target (monitored) account
-cross_account_role_arn = "arn:aws:iam::222222222222:role/stackalert-cost-reader"
-
-# Slack incoming webhook URL (https://hooks.slack.com/services/T.../B.../...)
+# Slack incoming webhook URL
 slack_webhook_url = "<your-slack-webhook-url>"
 
 # PagerDuty Events API v2 routing key
 pagerduty_routing_key = "r0uting-k3y-fr0m-pagerduty-s3rvice"
 
+# SES — sender must be verified in SES
+ses_from_address = "alerts@example.com"
+ses_to_addresses = "finance@example.com,ops@example.com"
+
 environment = "prod"
-setup_name  = "Cross-Account Monitoring"
+setup_name  = "Production"

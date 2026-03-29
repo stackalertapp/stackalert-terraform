@@ -26,6 +26,14 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project    = "stackalert"
+      ManagedBy  = "terraform"
+      Repository = "stackalertapp/stackalert-terraform"
+    }
+  }
 }
 
 # ── Step 1: Cross-account IAM role in the TARGET account ────────────────
@@ -68,7 +76,8 @@ module "stackalert" {
   aws_region         = var.aws_region
   artifact_s3_bucket = var.artifact_s3_bucket
   artifact_s3_key    = var.artifact_s3_key
-  environment        = "prod"
+  environment        = var.environment
+  setup_name         = var.setup_name
 
   # Cross-account
   cross_account_role_arn = var.cross_account_role_arn
@@ -82,7 +91,6 @@ module "stackalert" {
 
   # Lower threshold for multi-account: catch smaller anomalies
   spike_threshold_pct = 30
-  setup_name          = "Cross-Account Monitoring"
 }
 
 # ── Variables ──────────────────────────────────────────────────
@@ -115,6 +123,16 @@ variable "slack_webhook_url" {
 variable "pagerduty_routing_key" {
   type      = string
   sensitive = true
+}
+
+variable "environment" {
+  type    = string
+  default = "prod"
+}
+
+variable "setup_name" {
+  type    = string
+  default = "Cross-Account Monitoring"
 }
 
 # ── Outputs ────────────────────────────────────────────────────

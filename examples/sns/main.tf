@@ -23,6 +23,14 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project    = "stackalert"
+      ManagedBy  = "terraform"
+      Repository = "stackalertapp/stackalert-terraform"
+    }
+  }
 }
 
 # Optional: create the SNS topic in the same stack
@@ -42,13 +50,13 @@ module "stackalert" {
   aws_region         = var.aws_region
   artifact_s3_bucket = var.artifact_s3_bucket
   artifact_s3_key    = var.artifact_s3_key
-  environment        = "prod"
+  environment        = var.environment
 
   # SNS
   notify_channels = "sns"
   sns_topic_arn   = aws_sns_topic.cost_alerts.arn
 
-  setup_name = "SNS Alerts"
+  setup_name = var.setup_name
 }
 
 # ── Variables ──────────────────────────────────────────────────
@@ -71,6 +79,16 @@ variable "artifact_s3_key" {
 variable "alert_email" {
   type        = string
   description = "Email address to subscribe to the SNS topic."
+}
+
+variable "environment" {
+  type    = string
+  default = "prod"
+}
+
+variable "setup_name" {
+  type    = string
+  default = "SNS Alerts"
 }
 
 # ── Outputs ────────────────────────────────────────────────────

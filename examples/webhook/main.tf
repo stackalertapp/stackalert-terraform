@@ -22,6 +22,14 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project    = "stackalert"
+      ManagedBy  = "terraform"
+      Repository = "stackalertapp/stackalert-terraform"
+    }
+  }
 }
 
 module "stackalert" {
@@ -30,7 +38,7 @@ module "stackalert" {
   aws_region         = var.aws_region
   artifact_s3_bucket = var.artifact_s3_bucket
   artifact_s3_key    = var.artifact_s3_key
-  environment        = "prod"
+  environment        = var.environment
 
   # Webhook with bearer auth
   notify_channels     = "webhook"
@@ -39,7 +47,7 @@ module "stackalert" {
 
   # Tuning
   spike_threshold_pct = 50
-  setup_name          = "StackAlert Webhook"
+  setup_name          = var.setup_name
 }
 
 # ── Variables ──────────────────────────────────────────────────
@@ -70,6 +78,16 @@ variable "webhook_auth_header" {
   sensitive   = true
   default     = ""
   description = "Optional Authorization header value (e.g. 'Bearer sk-...')."
+}
+
+variable "environment" {
+  type    = string
+  default = "prod"
+}
+
+variable "setup_name" {
+  type    = string
+  default = "StackAlert Webhook"
 }
 
 # ── Outputs ────────────────────────────────────────────────────

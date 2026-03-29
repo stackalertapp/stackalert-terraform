@@ -1,0 +1,10 @@
+aws_region = "eu-central-1"
+
+# Create a bot via @BotFather, then add it to your group/channel.
+# Get the chat ID via @userinfobot or the getUpdates API.
+telegram_bot_token  = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+telegram_chat_id    = "-100123456789"
+
+environment         = "prod"
+setup_name          = "StackAlert"
+spike_threshold_pct = 50

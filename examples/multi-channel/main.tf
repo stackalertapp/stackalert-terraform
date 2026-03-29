@@ -24,6 +24,14 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project    = "stackalert"
+      ManagedBy  = "terraform"
+      Repository = "stackalertapp/stackalert-terraform"
+    }
+  }
 }
 
 module "stackalert" {
@@ -32,7 +40,7 @@ module "stackalert" {
   aws_region         = var.aws_region
   artifact_s3_bucket = var.artifact_s3_bucket
   artifact_s3_key    = var.artifact_s3_key
-  environment        = "prod"
+  environment        = var.environment
 
   # Fan out to Slack + PagerDuty + SES
   notify_channels = "slack,pagerduty,ses"
@@ -50,7 +58,7 @@ module "stackalert" {
 
   # Tuning
   spike_threshold_pct = 40
-  setup_name          = "Production"
+  setup_name          = var.setup_name
   history_days        = 14
   min_avg_daily_usd   = 1.00
 
@@ -93,6 +101,16 @@ variable "ses_from_address" {
 variable "ses_to_addresses" {
   type        = string
   description = "Comma-separated recipient list (e.g. finance@example.com,ops@example.com)."
+}
+
+variable "environment" {
+  type    = string
+  default = "prod"
+}
+
+variable "setup_name" {
+  type    = string
+  default = "Production"
 }
 
 # ── Outputs ────────────────────────────────────────────────────

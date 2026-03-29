@@ -23,6 +23,14 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project    = "stackalert"
+      ManagedBy  = "terraform"
+      Repository = "stackalertapp/stackalert-terraform"
+    }
+  }
 }
 
 module "stackalert" {
@@ -31,7 +39,8 @@ module "stackalert" {
   aws_region         = var.aws_region
   artifact_s3_bucket = var.artifact_s3_bucket
   artifact_s3_key    = var.artifact_s3_key
-  environment        = "prod"
+  environment        = var.environment
+  setup_name         = var.setup_name
 
   # Notification
   notify_channels    = "telegram"
@@ -63,6 +72,16 @@ variable "telegram_bot_token" {
 
 variable "telegram_chat_id" {
   type = string
+}
+
+variable "environment" {
+  type    = string
+  default = "prod"
+}
+
+variable "setup_name" {
+  type    = string
+  default = "StackAlert"
 }
 
 # ── Outputs ────────────────────────────────────────────────────

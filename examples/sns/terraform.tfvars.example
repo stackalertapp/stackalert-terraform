@@ -2,8 +2,8 @@ aws_region         = "eu-central-1"
 artifact_s3_bucket = "my-stackalert-artifacts"
 artifact_s3_key    = "stackalert-lambda/latest.zip"
 
-telegram_bot_token = "1234567890:AAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-telegram_chat_id   = "-1001234567890"
+# Email to subscribe to the SNS topic (confirm subscription via email)
+alert_email = "oncall@example.com"
 
 environment = "prod"
-setup_name  = "StackAlert"
+setup_name  = "SNS Alerts"
