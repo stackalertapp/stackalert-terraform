@@ -47,7 +47,6 @@ resource "aws_sns_topic_subscription" "email" {
 module "stackalert" {
   source = "../../"
 
-  aws_region         = var.aws_region
   artifact_s3_bucket = var.artifact_s3_bucket
   artifact_s3_key    = var.artifact_s3_key
   environment        = var.environment

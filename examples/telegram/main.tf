@@ -39,7 +39,6 @@ provider "aws" {
 module "stackalert" {
   source = "../../"
 
-  aws_region      = var.aws_region
   lambda_filename = "${path.module}/lambda-arm64.zip"
   environment     = var.environment
 
