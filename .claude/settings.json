@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "enabledPlugins": {
+    "terraform@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "aws-cdk@aws-skills": true,
+    "aws-cost-ops@aws-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "aws-skills": {
+      "source": {
+        "source": "github",
+        "repo": "zxkane/aws-skills"
+      }
+    }
+  }
+}

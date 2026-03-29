@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    },
+    "aws-cdk-mcp-server": {
+      "command": "uvx",
+      "args": ["awslabs.cdk-mcp-server@latest"]
+    },
+    "aws-iac-mcp-server": {
+      "command": "uvx",
+      "args": ["awslabs.aws-iac-mcp-server@latest"]
+    },
+    "aws-documentation-mcp-server": {
+      "command": "uvx",
+      "args": ["awslabs.aws-documentation-mcp-server@latest"]
+    },
+    "aws-knowledge-mcp-server": {
+      "type": "url",
+      "url": "https://knowledge-mcp.global.api.aws"
+    },
+    "terraform-mcp-server": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "TFE_TOKEN=${TFE_TOKEN}", "hashicorp/terraform-mcp-server:0.4.0"]
+    }
+  }
+}
