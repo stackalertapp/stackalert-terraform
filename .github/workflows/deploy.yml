@@ -18,12 +18,19 @@ permissions:
 env:
   TF_VAR_environment: ${{ github.event.inputs.environment || 'prod' }}
   TF_VAR_artifact_s3_bucket: ${{ vars.ARTIFACT_S3_BUCKET || 'placeholder-bucket' }}
-  TF_VAR_notification_channels: ${{ vars.NOTIFICATION_CHANNELS || 'slack' }}
+  TF_VAR_notify_channels: ${{ vars.NOTIFY_CHANNELS || 'telegram' }}
   TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-  TF_VAR_telegram_chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+  TF_VAR_telegram_chat_id: ${{ vars.TELEGRAM_CHAT_ID }}
   TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TF_VAR_teams_webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
   TF_VAR_pagerduty_routing_key: ${{ secrets.PAGERDUTY_ROUTING_KEY }}
+  TF_VAR_webhook_url: ${{ secrets.WEBHOOK_URL }}
+  TF_VAR_webhook_auth_header: ${{ secrets.WEBHOOK_AUTH_HEADER }}
+  TF_VAR_ses_from_address: ${{ vars.SES_FROM_ADDRESS }}
+  TF_VAR_ses_to_addresses: ${{ vars.SES_TO_ADDRESSES }}
+  TF_VAR_sns_topic_arn: ${{ vars.SNS_TOPIC_ARN }}
   TF_VAR_cross_account_role_arn: ${{ vars.CROSS_ACCOUNT_ROLE_ARN }}
+  TF_VAR_external_id: ${{ vars.EXTERNAL_ID }}
 
 jobs:
   check-config:

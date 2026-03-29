@@ -20,49 +20,121 @@ variable "artifact_s3_key" {
   default     = "stackalert-lambda/latest.zip"
 }
 
-variable "notification_channels" {
-  description = "Comma-separated list of notification channels to enable. Valid values: slack, telegram, pagerduty. Example: \"slack,telegram\""
+# ============================================================
+# Notification channels
+# ============================================================
+
+variable "notify_channels" {
+  description = "Comma-separated list of notification channels to enable. Valid values: slack, telegram, teams, pagerduty, ses, sns, webhook. Example: \"slack,telegram\""
   type        = string
-  default     = "slack"
+  default     = "telegram"
 
   validation {
     condition = alltrue([
-      for c in split(",", var.notification_channels) :
-      contains(["slack", "telegram", "pagerduty"], trimspace(c))
+      for c in split(",", var.notify_channels) :
+      contains(["slack", "telegram", "teams", "pagerduty", "ses", "sns", "webhook"], trimspace(c))
     ])
-    error_message = "notification_channels must be a comma-separated list containing only: slack, telegram, pagerduty."
+    error_message = "notify_channels must be a comma-separated list containing only: slack, telegram, teams, pagerduty, ses, sns, webhook."
   }
 }
 
+# ── Slack ──────────────────────────────────────────────────────
+
 variable "slack_webhook_url" {
-  description = "Slack incoming webhook URL. Required when 'slack' is in notification_channels."
+  description = "Slack incoming webhook URL. Required when 'slack' is in notify_channels."
   type        = string
   sensitive   = true
   default     = ""
 }
 
+# ── Telegram ───────────────────────────────────────────────────
+
 variable "telegram_bot_token" {
-  description = "Telegram bot token. Required when 'telegram' is in notification_channels."
+  description = "Telegram bot token. Required when 'telegram' is in notify_channels."
   type        = string
   sensitive   = true
   default     = ""
 }
 
 variable "telegram_chat_id" {
-  description = "Telegram chat/group ID to send cost alerts to. Required when 'telegram' is in notification_channels."
+  description = "Telegram chat/group ID to send cost alerts to. Required when 'telegram' is in notify_channels."
   type        = string
   default     = ""
 }
 
-variable "pagerduty_routing_key" {
-  description = "PagerDuty Events API v2 routing/integration key. Required when 'pagerduty' is in notification_channels."
+# ── Microsoft Teams ────────────────────────────────────────────
+
+variable "teams_webhook_url" {
+  description = "Microsoft Teams incoming webhook URL. Required when 'teams' is in notify_channels."
   type        = string
   sensitive   = true
   default     = ""
 }
 
+# ── PagerDuty ──────────────────────────────────────────────────
+
+variable "pagerduty_routing_key" {
+  description = "PagerDuty Events API v2 routing/integration key. Required when 'pagerduty' is in notify_channels."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "pagerduty_severity" {
+  description = "PagerDuty alert severity. Only used when 'pagerduty' is in notify_channels."
+  type        = string
+  default     = "error"
+
+  validation {
+    condition     = contains(["critical", "error", "warning", "info"], var.pagerduty_severity)
+    error_message = "pagerduty_severity must be one of: critical, error, warning, info."
+  }
+}
+
+# ── SES (Email) ────────────────────────────────────────────────
+
+variable "ses_from_address" {
+  description = "Verified SES sender email address. Required when 'ses' is in notify_channels."
+  type        = string
+  default     = ""
+}
+
+variable "ses_to_addresses" {
+  description = "Comma-separated list of recipient email addresses. Required when 'ses' is in notify_channels."
+  type        = string
+  default     = ""
+}
+
+# ── SNS ────────────────────────────────────────────────────────
+
+variable "sns_topic_arn" {
+  description = "SNS topic ARN to publish alerts to. Required when 'sns' is in notify_channels."
+  type        = string
+  default     = ""
+}
+
+# ── Webhook ────────────────────────────────────────────────────
+
+variable "webhook_url" {
+  description = "Webhook URL for generic HTTP POST notifications. Required when 'webhook' is in notify_channels."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "webhook_auth_header" {
+  description = "Optional Authorization header value for webhook requests (e.g. 'Bearer token'). Only used when 'webhook' is in notify_channels."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# ============================================================
+# Spike detection & tuning
+# ============================================================
+
 variable "spike_threshold_pct" {
-  description = "Spike threshold: alert when today's spend exceeds 7-day average by this percentage."
+  description = "Spike threshold: alert when today's spend exceeds rolling average by this percentage."
   type        = number
   default     = 50
 
@@ -72,11 +144,83 @@ variable "spike_threshold_pct" {
   }
 }
 
+variable "setup_name" {
+  description = "Human-readable name shown in alert messages (e.g. 'Production', 'Staging')."
+  type        = string
+  default     = "StackAlert"
+}
+
+variable "history_days" {
+  description = "Number of days for the rolling average window used in spike detection."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.history_days >= 1 && var.history_days <= 90
+    error_message = "history_days must be between 1 and 90."
+  }
+}
+
+variable "min_avg_daily_usd" {
+  description = "Minimum average daily spend (USD) for a service to be included in spike detection. Filters noise from low-spend services."
+  type        = number
+  default     = 0.10
+}
+
+variable "dedup_cooldown_hours" {
+  description = "Hours to suppress repeat alerts for the same service spike."
+  type        = number
+  default     = 6
+
+  validation {
+    condition     = var.dedup_cooldown_hours >= 0 && var.dedup_cooldown_hours <= 168
+    error_message = "dedup_cooldown_hours must be between 0 and 168 (1 week)."
+  }
+}
+
+variable "max_spike_display" {
+  description = "Maximum number of services to display in a spike alert."
+  type        = number
+  default     = 5
+}
+
+variable "max_digest_display" {
+  description = "Maximum number of services to display in a daily digest."
+  type        = number
+  default     = 10
+}
+
+variable "http_timeout_secs" {
+  description = "HTTP request timeout in seconds for notification delivery."
+  type        = number
+  default     = 10
+}
+
+variable "http_connect_timeout_secs" {
+  description = "HTTP connect timeout in seconds for notification delivery."
+  type        = number
+  default     = 5
+}
+
+# ============================================================
+# Cross-account monitoring
+# ============================================================
+
 variable "cross_account_role_arn" {
   description = "Optional IAM role ARN in another account to assume for Cost Explorer queries. Leave empty for single-account mode."
   type        = string
   default     = ""
 }
+
+variable "external_id" {
+  description = "Optional ExternalId for STS AssumeRole when using cross-account monitoring."
+  type        = string
+  default     = ""
+}
+
+# ============================================================
+# Scheduling
+# ============================================================
 
 variable "spike_schedule" {
   description = "EventBridge cron/rate expression for spike checks."
@@ -89,6 +233,10 @@ variable "digest_schedule" {
   type        = string
   default     = "cron(0 8 * * ? *)"
 }
+
+# ============================================================
+# Lambda configuration
+# ============================================================
 
 variable "lambda_memory_mb" {
   description = "Lambda memory allocation in MB."

@@ -18,7 +18,10 @@ output "ssm_parameter_paths" {
   value = compact([
     length(aws_ssm_parameter.telegram_bot_token) > 0 ? aws_ssm_parameter.telegram_bot_token[0].name : "",
     length(aws_ssm_parameter.slack_webhook_url) > 0 ? aws_ssm_parameter.slack_webhook_url[0].name : "",
+    length(aws_ssm_parameter.teams_webhook_url) > 0 ? aws_ssm_parameter.teams_webhook_url[0].name : "",
     length(aws_ssm_parameter.pagerduty_routing_key) > 0 ? aws_ssm_parameter.pagerduty_routing_key[0].name : "",
+    length(aws_ssm_parameter.webhook_url) > 0 ? aws_ssm_parameter.webhook_url[0].name : "",
+    length(aws_ssm_parameter.webhook_auth_header) > 0 ? aws_ssm_parameter.webhook_auth_header[0].name : "",
   ])
 }
 

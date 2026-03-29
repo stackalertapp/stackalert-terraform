@@ -41,6 +41,24 @@ resource "aws_ssm_parameter" "slack_webhook_url" {
   }
 }
 
+# ── Microsoft Teams ───────────────────────────────────────────
+
+resource "aws_ssm_parameter" "teams_webhook_url" {
+  count = contains(local.channels, "teams") ? 1 : 0
+
+  name        = "/stackalert/${var.environment}/teams-webhook-url"
+  description = "StackAlert Microsoft Teams incoming webhook URL — managed by Terraform"
+  type        = "SecureString"
+  value       = var.teams_webhook_url
+  key_id      = var.create_kms_key ? aws_kms_key.ssm[0].key_id : "alias/aws/ssm"
+
+  tags = local.common_tags
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
 # ── PagerDuty ──────────────────────────────────────────────────
 
 resource "aws_ssm_parameter" "pagerduty_routing_key" {
@@ -50,6 +68,40 @@ resource "aws_ssm_parameter" "pagerduty_routing_key" {
   description = "StackAlert PagerDuty Events API v2 routing key — managed by Terraform"
   type        = "SecureString"
   value       = var.pagerduty_routing_key
+  key_id      = var.create_kms_key ? aws_kms_key.ssm[0].key_id : "alias/aws/ssm"
+
+  tags = local.common_tags
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+# ── Webhook ────────────────────────────────────────────────────
+
+resource "aws_ssm_parameter" "webhook_url" {
+  count = contains(local.channels, "webhook") ? 1 : 0
+
+  name        = "/stackalert/${var.environment}/webhook-url"
+  description = "StackAlert generic webhook URL — managed by Terraform"
+  type        = "SecureString"
+  value       = var.webhook_url
+  key_id      = var.create_kms_key ? aws_kms_key.ssm[0].key_id : "alias/aws/ssm"
+
+  tags = local.common_tags
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+resource "aws_ssm_parameter" "webhook_auth_header" {
+  count = contains(local.channels, "webhook") && var.webhook_auth_header != "" ? 1 : 0
+
+  name        = "/stackalert/${var.environment}/webhook-auth-header"
+  description = "StackAlert webhook Authorization header — managed by Terraform"
+  type        = "SecureString"
+  value       = var.webhook_auth_header
   key_id      = var.create_kms_key ? aws_kms_key.ssm[0].key_id : "alias/aws/ssm"
 
   tags = local.common_tags

@@ -73,7 +73,10 @@ data "aws_iam_policy_document" "lambda_ssm" {
     resources = compact([
       length(aws_ssm_parameter.slack_webhook_url) > 0 ? aws_ssm_parameter.slack_webhook_url[0].arn : "",
       length(aws_ssm_parameter.telegram_bot_token) > 0 ? aws_ssm_parameter.telegram_bot_token[0].arn : "",
+      length(aws_ssm_parameter.teams_webhook_url) > 0 ? aws_ssm_parameter.teams_webhook_url[0].arn : "",
       length(aws_ssm_parameter.pagerduty_routing_key) > 0 ? aws_ssm_parameter.pagerduty_routing_key[0].arn : "",
+      length(aws_ssm_parameter.webhook_url) > 0 ? aws_ssm_parameter.webhook_url[0].arn : "",
+      length(aws_ssm_parameter.webhook_auth_header) > 0 ? aws_ssm_parameter.webhook_auth_header[0].arn : "",
     ])
   }
 
@@ -207,6 +210,54 @@ resource "aws_iam_role_policy" "lambda_sts" {
   name   = "sts-cross-account"
   role   = aws_iam_role.stackalert.id
   policy = data.aws_iam_policy_document.lambda_sts[0].json
+}
+
+# ============================================================
+# SES: allow Lambda to send emails (conditional on ses channel)
+# ============================================================
+
+data "aws_iam_policy_document" "lambda_ses" {
+  count = contains(local.channels, "ses") ? 1 : 0
+
+  statement {
+    sid    = "AllowSESSendEmail"
+    effect = "Allow"
+    actions = [
+      "ses:SendEmail",
+    ]
+    resources = ["*"] # SES does not support resource-level permissions for SendEmail
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_ses" {
+  count  = contains(local.channels, "ses") ? 1 : 0
+  name   = "ses-send-email"
+  role   = aws_iam_role.stackalert.id
+  policy = data.aws_iam_policy_document.lambda_ses[0].json
+}
+
+# ============================================================
+# SNS: allow Lambda to publish to the configured topic
+# ============================================================
+
+data "aws_iam_policy_document" "lambda_sns" {
+  count = contains(local.channels, "sns") ? 1 : 0
+
+  statement {
+    sid    = "AllowSNSPublish"
+    effect = "Allow"
+    actions = [
+      "sns:Publish",
+    ]
+    resources = [var.sns_topic_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_sns" {
+  count  = contains(local.channels, "sns") ? 1 : 0
+  name   = "sns-publish"
+  role   = aws_iam_role.stackalert.id
+  policy = data.aws_iam_policy_document.lambda_sns[0].json
 }
 
 # ============================================================

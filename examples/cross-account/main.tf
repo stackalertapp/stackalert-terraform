@@ -1,11 +1,17 @@
 # ============================================================
-# Example: Cross-account monitoring
+# Example: Cross-account cost monitoring
 #
 # Deploys StackAlert in account A (monitoring account) and
 # monitors costs in account B (target account) via STS AssumeRole.
 #
-# Step 1: Create the cross-account role in account B
-# Step 2: Deploy StackAlert in account A with the role ARN
+# Step 1: Create the cross-account role in account B (see below)
+# Step 2: Deploy this config in account A with the role ARN
+#
+# Usage:
+#   cp terraform.tfvars.example terraform.tfvars
+#   # Fill in artifact_s3_bucket, cross_account_role_arn, channel secrets
+#   terraform init
+#   terraform apply
 # ============================================================
 
 terraform {
@@ -23,8 +29,7 @@ provider "aws" {
 }
 
 # ── Step 1: Cross-account IAM role in the TARGET account ────────────────
-# Run this block with credentials for account B (the monitored account).
-# Comment it out after the role is created.
+# Run this in account B (the monitored account), then comment it out.
 #
 # resource "aws_iam_role" "stackalert_reader" {
 #   name = "stackalert-cost-reader"
@@ -35,6 +40,9 @@ provider "aws" {
 #       Effect    = "Allow"
 #       Action    = "sts:AssumeRole"
 #       Principal = { AWS = "arn:aws:iam::MONITORING_ACCOUNT_ID:root" }
+#       Condition = {
+#         StringEquals = { "sts:ExternalId" = "stackalert-cross-account" }
+#       }
 #     }]
 #   })
 # }
@@ -53,20 +61,31 @@ provider "aws" {
 # }
 
 # ── Step 2: Deploy StackAlert in the MONITORING account ─────────────────
+
 module "stackalert" {
   source = "../../"
 
-  aws_region             = var.aws_region
-  artifact_s3_bucket     = var.artifact_s3_bucket
-  artifact_s3_key        = var.artifact_s3_key
-  notification_channels  = var.notification_channels
-  slack_webhook_url      = var.slack_webhook_url
-  telegram_chat_id       = var.telegram_chat_id
-  telegram_bot_token     = var.telegram_bot_token
+  aws_region         = var.aws_region
+  artifact_s3_bucket = var.artifact_s3_bucket
+  artifact_s3_key    = var.artifact_s3_key
+  environment        = "prod"
+
+  # Cross-account
   cross_account_role_arn = var.cross_account_role_arn
-  spike_threshold_pct    = 30 # Lower threshold for multi-account monitoring
-  environment            = "prod"
+  external_id            = "stackalert-cross-account"
+
+  # Notification — Slack + PagerDuty for ops visibility
+  notify_channels       = "slack,pagerduty"
+  slack_webhook_url     = var.slack_webhook_url
+  pagerduty_routing_key = var.pagerduty_routing_key
+  pagerduty_severity    = "warning"
+
+  # Lower threshold for multi-account: catch smaller anomalies
+  spike_threshold_pct = 30
+  setup_name          = "Cross-Account Monitoring"
 }
+
+# ── Variables ──────────────────────────────────────────────────
 
 variable "aws_region" {
   type    = string
@@ -74,7 +93,8 @@ variable "aws_region" {
 }
 
 variable "artifact_s3_bucket" {
-  type = string
+  type        = string
+  description = "S3 bucket containing the pre-built Lambda ZIP artifact."
 }
 
 variable "artifact_s3_key" {
@@ -82,30 +102,32 @@ variable "artifact_s3_key" {
   default = "stackalert-lambda/latest.zip"
 }
 
-variable "notification_channels" {
-  type    = string
-  default = "slack"
+variable "cross_account_role_arn" {
+  type        = string
+  description = "ARN of the IAM role in the target account (e.g. arn:aws:iam::TARGET_ACCOUNT_ID:role/stackalert-cost-reader)."
 }
 
 variable "slack_webhook_url" {
   type      = string
   sensitive = true
-  default   = ""
 }
 
-variable "telegram_chat_id" {
+variable "pagerduty_routing_key" {
   type      = string
   sensitive = true
-  default   = ""
 }
 
-variable "telegram_bot_token" {
-  type      = string
-  sensitive = true
-  default   = ""
+# ── Outputs ────────────────────────────────────────────────────
+
+output "lambda_function_name" {
+  value = module.stackalert.lambda_function_name
 }
 
-variable "cross_account_role_arn" {
-  type        = string
-  description = "ARN of the IAM role in the target account. Example: arn:aws:iam::TARGET_ACCOUNT_ID:role/stackalert-cost-reader"
+output "lambda_role_arn" {
+  description = "Use this ARN as the Principal in the target account's trust policy."
+  value       = module.stackalert.lambda_role_arn
+}
+
+output "invoke_spike" {
+  value = module.stackalert.invoke_command_spike
 }

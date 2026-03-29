@@ -1,14 +1,14 @@
 # ============================================================
-# Example: Single AWS account monitoring with Telegram
+# Example: SNS topic integration
 #
-# Minimal setup — monitors one AWS account and sends Telegram
-# alerts when any service spends 50%+ more than its 7-day average.
+# Publishes cost alerts to an SNS topic. Subscribers can be
+# email, SMS, Lambda, SQS, or any SNS-supported protocol.
+# Good for teams that already have an SNS-based alerting pipeline.
 #
 # Usage:
-#   cp terraform.tfvars.example terraform.tfvars
-#   # Fill in artifact_s3_bucket, telegram_bot_token, telegram_chat_id
 #   terraform init
-#   terraform apply
+#   terraform apply -var="artifact_s3_bucket=my-bucket" \
+#                   -var="sns_topic_arn=arn:aws:sns:eu-central-1:123456789012:cost-alerts"
 # ============================================================
 
 terraform {
@@ -25,6 +25,17 @@ provider "aws" {
   region = var.aws_region
 }
 
+# Optional: create the SNS topic in the same stack
+resource "aws_sns_topic" "cost_alerts" {
+  name = "stackalert-cost-alerts"
+}
+
+resource "aws_sns_topic_subscription" "email" {
+  topic_arn = aws_sns_topic.cost_alerts.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}
+
 module "stackalert" {
   source = "../../"
 
@@ -33,10 +44,11 @@ module "stackalert" {
   artifact_s3_key    = var.artifact_s3_key
   environment        = "prod"
 
-  # Notification
-  notify_channels    = "telegram"
-  telegram_bot_token = var.telegram_bot_token
-  telegram_chat_id   = var.telegram_chat_id
+  # SNS
+  notify_channels = "sns"
+  sns_topic_arn   = aws_sns_topic.cost_alerts.arn
+
+  setup_name = "SNS Alerts"
 }
 
 # ── Variables ──────────────────────────────────────────────────
@@ -56,13 +68,9 @@ variable "artifact_s3_key" {
   default = "stackalert-lambda/latest.zip"
 }
 
-variable "telegram_bot_token" {
-  type      = string
-  sensitive = true
-}
-
-variable "telegram_chat_id" {
-  type = string
+variable "alert_email" {
+  type        = string
+  description = "Email address to subscribe to the SNS topic."
 }
 
 # ── Outputs ────────────────────────────────────────────────────
@@ -71,10 +79,10 @@ output "lambda_function_name" {
   value = module.stackalert.lambda_function_name
 }
 
-output "invoke_spike" {
-  value = module.stackalert.invoke_command_spike
+output "sns_topic_arn" {
+  value = aws_sns_topic.cost_alerts.arn
 }
 
-output "invoke_digest" {
-  value = module.stackalert.invoke_command_digest
+output "invoke_spike" {
+  value = module.stackalert.invoke_command_spike
 }

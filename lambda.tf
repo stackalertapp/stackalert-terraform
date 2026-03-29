@@ -6,7 +6,7 @@
 
 resource "aws_lambda_function" "stackalert" {
   function_name = "stackalert-${var.environment}"
-  description   = "StackAlert — AWS cost spike detector. Alerts via Slack, Telegram, and/or PagerDuty when spend exceeds threshold."
+  description   = "StackAlert — AWS cost spike detector. Alerts via Slack, Telegram, Teams, PagerDuty, SES, SNS, and/or Webhook."
 
   # Artifact from stackalert-lambda CI (built in GitHub Actions, uploaded to S3)
   s3_bucket = var.artifact_s3_bucket
@@ -39,21 +39,69 @@ resource "aws_lambda_function" "stackalert" {
   }
 
   environment {
-    variables = {
-      # Which channels to fan-out to (comma-separated: slack, telegram, pagerduty)
-      NOTIFICATION_CHANNELS = var.notification_channels
+    variables = merge(
+      {
+        # Which channels to fan-out to (comma-separated)
+        NOTIFY_CHANNELS = var.notify_channels
 
-      # Per-channel credentials — only the channels listed above are used by the Lambda
-      SLACK_WEBHOOK_URL     = var.slack_webhook_url
-      TELEGRAM_BOT_TOKEN    = var.telegram_bot_token
-      TELEGRAM_CHAT_ID      = var.telegram_chat_id
-      PAGERDUTY_ROUTING_KEY = var.pagerduty_routing_key
+        # Spike detection & tuning
+        SPIKE_THRESHOLD_PCT       = tostring(var.spike_threshold_pct)
+        SETUP_NAME                = var.setup_name
+        HISTORY_DAYS              = tostring(var.history_days)
+        MIN_AVG_DAILY_USD         = tostring(var.min_avg_daily_usd)
+        DEDUP_COOLDOWN_HOURS      = tostring(var.dedup_cooldown_hours)
+        MAX_SPIKE_DISPLAY         = tostring(var.max_spike_display)
+        MAX_DIGEST_DISPLAY        = tostring(var.max_digest_display)
+        HTTP_TIMEOUT_SECS         = tostring(var.http_timeout_secs)
+        HTTP_CONNECT_TIMEOUT_SECS = tostring(var.http_connect_timeout_secs)
 
-      SPIKE_THRESHOLD_PCT    = tostring(var.spike_threshold_pct)
-      CROSS_ACCOUNT_ROLE_ARN = var.cross_account_role_arn
-      RUST_LOG               = "stackalert_lambda=info,aws_sdk=warn"
-      DLQ_URL                = aws_sqs_queue.dlq.url
-    }
+        # Cross-account monitoring
+        CROSS_ACCOUNT_ROLE_ARN = var.cross_account_role_arn
+        EXTERNAL_ID            = var.external_id
+
+        # Logging
+        RUST_LOG = "stackalert_lambda=info,aws_sdk=warn"
+        DLQ_URL  = aws_sqs_queue.dlq.url
+      },
+
+      # ── Per-channel config (SSM param paths for secrets, env vars for non-secrets) ──
+
+      contains(local.channels, "slack") ? {
+        SLACK_WEBHOOK_URL_SSM_PARAM = aws_ssm_parameter.slack_webhook_url[0].name
+      } : {},
+
+      contains(local.channels, "telegram") ? {
+        TELEGRAM_BOT_TOKEN_SSM_PARAM = aws_ssm_parameter.telegram_bot_token[0].name
+        TELEGRAM_CHAT_ID             = var.telegram_chat_id
+      } : {},
+
+      contains(local.channels, "teams") ? {
+        TEAMS_WEBHOOK_URL_SSM_PARAM = aws_ssm_parameter.teams_webhook_url[0].name
+      } : {},
+
+      contains(local.channels, "pagerduty") ? {
+        PAGERDUTY_ROUTING_KEY_SSM_PARAM = aws_ssm_parameter.pagerduty_routing_key[0].name
+        PAGERDUTY_SEVERITY              = var.pagerduty_severity
+      } : {},
+
+      contains(local.channels, "ses") ? {
+        SES_FROM_ADDRESS = var.ses_from_address
+        SES_TO_ADDRESSES = var.ses_to_addresses
+      } : {},
+
+      contains(local.channels, "sns") ? {
+        SNS_TOPIC_ARN = var.sns_topic_arn
+      } : {},
+
+      contains(local.channels, "webhook") ? merge(
+        {
+          WEBHOOK_URL_SSM_PARAM = aws_ssm_parameter.webhook_url[0].name
+        },
+        var.webhook_auth_header != "" ? {
+          WEBHOOK_AUTH_HEADER_SSM_PARAM = aws_ssm_parameter.webhook_auth_header[0].name
+        } : {},
+      ) : {},
+    )
   }
 
   tags = local.common_tags

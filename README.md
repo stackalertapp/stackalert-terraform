@@ -4,7 +4,7 @@
 [![Security](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/security.yml/badge.svg)](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/security.yml)
 [![Deploy](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/deploy.yml/badge.svg)](https://github.com/stackalertapp/stackalert-terraform/actions/workflows/deploy.yml)
 
-Terraform infrastructure for [StackAlert](https://github.com/stackalertapp/stackalert-lambda) — AWS cost spike detection with alerts via **Slack**, **Telegram**, and/or **PagerDuty**.
+Terraform infrastructure for [StackAlert](https://github.com/stackalertapp/stackalert-lambda) — AWS cost spike detection with alerts via **Slack**, **Telegram**, **Microsoft Teams**, **PagerDuty**, **SES (Email)**, **SNS**, and/or **Webhook**.
 
 ## Resources Created
 
@@ -12,7 +12,7 @@ Terraform infrastructure for [StackAlert](https://github.com/stackalertapp/stack
 |---|---|
 | `aws_lambda_function` | StackAlert Rust Lambda (arm64, provided.al2023) |
 | `aws_iam_role` | Least-privilege execution role |
-| `aws_cloudwatch_event_rule` × 2 | Spike check (every 6h) + daily digest (08:00 UTC) |
+| `aws_cloudwatch_event_rule` x 2 | Spike check (every 6h) + daily digest (08:00 UTC) |
 | `aws_ssm_parameter` | Per-channel secrets (SecureString, only for enabled channels) |
 | `aws_sqs_queue` | Dead-letter queue for failed invocations |
 | `aws_cloudwatch_log_group` | JSON-structured Lambda logs |
@@ -30,11 +30,13 @@ Terraform infrastructure for [StackAlert](https://github.com/stackalertapp/stack
 | `AWS_DEPLOY_ROLE_ARN` | Secret | IAM role ARN for GitHub Actions OIDC |
 | `ARTIFACT_S3_BUCKET` | Variable | S3 bucket name for Lambda artifact |
 | `AWS_REGION` | Variable | AWS region (default: `eu-central-1`) |
-| `NOTIFICATION_CHANNELS` | Variable | Enabled channels, e.g. `slack,telegram` |
+| `NOTIFY_CHANNELS` | Variable | Enabled channels, e.g. `telegram,slack` |
 | `SLACK_WEBHOOK_URL` | Secret | Slack webhook URL _(if slack enabled)_ |
 | `TELEGRAM_BOT_TOKEN` | Secret | Telegram bot token _(if telegram enabled)_ |
 | `TELEGRAM_CHAT_ID` | Variable | Telegram chat/group ID _(if telegram enabled)_ |
+| `TEAMS_WEBHOOK_URL` | Secret | Teams webhook URL _(if teams enabled)_ |
 | `PAGERDUTY_ROUTING_KEY` | Secret | PagerDuty routing key _(if pagerduty enabled)_ |
+| `WEBHOOK_URL` | Secret | Webhook URL _(if webhook enabled)_ |
 | `CROSS_ACCOUNT_ROLE_ARN` | Variable | Optional: cross-account IAM role ARN |
 
 ## Usage
@@ -56,25 +58,50 @@ terraform apply
 ### terraform.tfvars.example
 
 ```hcl
-aws_region            = "eu-central-1"
-artifact_s3_bucket    = "my-stackalert-artifacts"
-artifact_s3_key       = "stackalert-lambda/latest.zip"
-environment           = "prod"
-spike_threshold_pct   = 50
+aws_region         = "eu-central-1"
+artifact_s3_bucket = "my-stackalert-artifacts"
+artifact_s3_key    = "stackalert-lambda/latest.zip"
+environment        = "prod"
+spike_threshold_pct = 50
 
 # ── Notification channels ────────────────────────────────────
-# Enable one or more: slack, telegram, pagerduty
-notification_channels = "slack"
+# Enable one or more: slack, telegram, teams, pagerduty, ses, sns, webhook
+notify_channels = "telegram"
 
-# Slack (required when 'slack' is in notification_channels)
-slack_webhook_url     = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXX"
+# Telegram (default channel)
+telegram_bot_token = "1234567890:AAXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+telegram_chat_id   = "-1001234567890"
 
-# Telegram (required when 'telegram' is in notification_channels)
-# telegram_bot_token  = "1234567890:AAXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-# telegram_chat_id    = "-1001234567890"
+# Slack
+# slack_webhook_url = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXX"
 
-# PagerDuty (required when 'pagerduty' is in notification_channels)
+# Microsoft Teams
+# teams_webhook_url = "https://outlook.office.com/webhook/..."
+
+# PagerDuty
 # pagerduty_routing_key = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# pagerduty_severity    = "error"
+
+# SES (Email)
+# ses_from_address = "alerts@example.com"
+# ses_to_addresses = "team@example.com,oncall@example.com"
+
+# SNS
+# sns_topic_arn = "arn:aws:sns:eu-central-1:123456789012:stackalert-alerts"
+
+# Webhook
+# webhook_url         = "https://example.com/webhook"
+# webhook_auth_header = "Bearer my-secret-token"
+
+# ── Tuning ───────────────────────────────────────────────────
+# setup_name             = "Production"
+# history_days           = 7
+# min_avg_daily_usd      = 0.10
+# dedup_cooldown_hours   = 6
+# max_spike_display      = 5
+# max_digest_display     = 10
+# http_timeout_secs      = 10
+# http_connect_timeout_secs = 5
 ```
 
 ## Input Variables
@@ -82,16 +109,32 @@ slack_webhook_url     = "https://hooks.slack.com/services/T00000000/B00000000/XX
 | Variable | Type | Default | Description |
 |---|---|---|---|
 | `aws_region` | string | `eu-central-1` | AWS region for all resources |
-| `artifact_s3_bucket` | string | — | S3 bucket with the Lambda ZIP |
+| `artifact_s3_bucket` | string | -- | S3 bucket with the Lambda ZIP |
 | `artifact_s3_key` | string | `stackalert-lambda/latest.zip` | S3 key for the ZIP |
 | `environment` | string | `prod` | Deployment environment (dev/staging/prod) |
-| `notification_channels` | string | `slack` | Comma-separated channels: `slack`, `telegram`, `pagerduty` |
+| `notify_channels` | string | `telegram` | Comma-separated channels: `slack`, `telegram`, `teams`, `pagerduty`, `ses`, `sns`, `webhook` |
 | `slack_webhook_url` | string | `""` | Slack incoming webhook URL |
 | `telegram_bot_token` | string | `""` | Telegram bot token |
 | `telegram_chat_id` | string | `""` | Telegram chat/group ID |
+| `teams_webhook_url` | string | `""` | Microsoft Teams incoming webhook URL |
 | `pagerduty_routing_key` | string | `""` | PagerDuty Events API v2 routing key |
-| `spike_threshold_pct` | number | `50` | % above 7-day average to trigger alert |
+| `pagerduty_severity` | string | `error` | PagerDuty alert severity (critical/error/warning/info) |
+| `ses_from_address` | string | `""` | Verified SES sender email address |
+| `ses_to_addresses` | string | `""` | Comma-separated recipient email addresses |
+| `sns_topic_arn` | string | `""` | SNS topic ARN to publish alerts to |
+| `webhook_url` | string | `""` | Generic webhook URL for HTTP POST notifications |
+| `webhook_auth_header` | string | `""` | Optional Authorization header for webhook |
+| `spike_threshold_pct` | number | `50` | % above rolling average to trigger alert |
+| `setup_name` | string | `StackAlert` | Human-readable name in alert messages |
+| `history_days` | number | `7` | Rolling average window in days |
+| `min_avg_daily_usd` | number | `0.10` | Minimum daily spend to include in spike detection |
+| `dedup_cooldown_hours` | number | `6` | Hours to suppress repeat alerts |
+| `max_spike_display` | number | `5` | Max services shown in spike alerts |
+| `max_digest_display` | number | `10` | Max services shown in daily digest |
+| `http_timeout_secs` | number | `10` | HTTP request timeout for notifications |
+| `http_connect_timeout_secs` | number | `5` | HTTP connect timeout for notifications |
 | `cross_account_role_arn` | string | `""` | Cross-account IAM role for Cost Explorer |
+| `external_id` | string | `""` | ExternalId for STS AssumeRole |
 | `spike_schedule` | string | `rate(6 hours)` | EventBridge schedule for spike checks |
 | `digest_schedule` | string | `cron(0 8 * * ? *)` | EventBridge schedule for daily digest |
 | `lambda_memory_mb` | number | `256` | Lambda memory in MB |
@@ -106,7 +149,14 @@ slack_webhook_url     = "https://hooks.slack.com/services/T00000000/B00000000/XX
 # Trigger spike check
 aws lambda invoke \
   --function-name stackalert-prod \
-  --payload '{}' \
+  --payload '{"mode":"spike"}' \
+  --cli-binary-format raw-in-base64-out \
+  /tmp/response.json && cat /tmp/response.json
+
+# Trigger daily digest
+aws lambda invoke \
+  --function-name stackalert-prod \
+  --payload '{"mode":"digest"}' \
   --cli-binary-format raw-in-base64-out \
   /tmp/response.json && cat /tmp/response.json
 ```
@@ -114,35 +164,43 @@ aws lambda invoke \
 ## Architecture
 
 ```
-EventBridge (every 6h)  ──► Lambda ──► Cost Explorer API ──► Slack
-EventBridge (daily 8am) ──►        └──► (per-service breakdown) ──► Telegram
-                                                                └──► PagerDuty
-                                  └──► SSM (channel secrets, read at deploy)
-                                  └──► CloudWatch Logs + SQS DLQ
+EventBridge (every 6h)  --> Lambda --> Cost Explorer API --> Slack / Telegram / Teams
+EventBridge (daily 8am) -->        |-> (per-service breakdown) --> PagerDuty / SES
+                                                               --> SNS / Webhook
+                                   |-> SSM (channel secrets, fetched at runtime)
+                                   |-> SSM (dedup state)
+                                   |-> CloudWatch Logs + SQS DLQ
 ```
 
 ## Multi-Channel Configuration
 
-StackAlert supports three notification channels simultaneously. Enable them via `notification_channels`:
+StackAlert supports seven notification channels simultaneously. Enable them via `notify_channels`:
 
 ```hcl
-# Slack only (default)
-notification_channels = "slack"
-slack_webhook_url     = "https://hooks.slack.com/..."
+# Telegram only (default)
+notify_channels    = "telegram"
+telegram_bot_token = "1234..."
+telegram_chat_id   = "-1001..."
 
 # Slack + Telegram
-notification_channels = "slack,telegram"
-slack_webhook_url     = "https://hooks.slack.com/..."
-telegram_bot_token    = "1234..."
-telegram_chat_id      = "-1001..."
+notify_channels    = "slack,telegram"
+slack_webhook_url  = "https://hooks.slack.com/..."
+telegram_bot_token = "1234..."
+telegram_chat_id   = "-1001..."
 
-# All three channels
-notification_channels = "slack,telegram,pagerduty"
+# All channels
+notify_channels       = "slack,telegram,teams,pagerduty,ses,sns,webhook"
 slack_webhook_url     = "https://hooks.slack.com/..."
 telegram_bot_token    = "1234..."
 telegram_chat_id      = "-1001..."
+teams_webhook_url     = "https://outlook.office.com/webhook/..."
 pagerduty_routing_key = "xxxx..."
+ses_from_address      = "alerts@example.com"
+ses_to_addresses      = "team@example.com"
+sns_topic_arn         = "arn:aws:sns:eu-central-1:123456789012:alerts"
+webhook_url           = "https://example.com/hook"
 ```
 
-SSM `SecureString` parameters are automatically created only for enabled channels. The Lambda IAM policy is scoped to those parameters only.
-# test
+SSM `SecureString` parameters are automatically created only for enabled channels that use secrets (Slack, Telegram, Teams, PagerDuty, Webhook). The Lambda reads secrets from SSM at runtime via `WithDecryption=true`. The IAM policy is scoped to those parameters only.
+
+Channels that don't need secrets (SES, SNS) are configured purely via environment variables.

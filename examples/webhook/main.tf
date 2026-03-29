@@ -1,12 +1,11 @@
 # ============================================================
-# Example: Single AWS account monitoring with Telegram
+# Example: Generic webhook integration
 #
-# Minimal setup — monitors one AWS account and sends Telegram
-# alerts when any service spends 50%+ more than its 7-day average.
+# Sends cost alerts to any HTTP endpoint (Datadog, Opsgenie,
+# custom API, etc.) via POST with optional auth header.
 #
 # Usage:
 #   cp terraform.tfvars.example terraform.tfvars
-#   # Fill in artifact_s3_bucket, telegram_bot_token, telegram_chat_id
 #   terraform init
 #   terraform apply
 # ============================================================
@@ -33,10 +32,14 @@ module "stackalert" {
   artifact_s3_key    = var.artifact_s3_key
   environment        = "prod"
 
-  # Notification
-  notify_channels    = "telegram"
-  telegram_bot_token = var.telegram_bot_token
-  telegram_chat_id   = var.telegram_chat_id
+  # Webhook with bearer auth
+  notify_channels     = "webhook"
+  webhook_url         = var.webhook_url
+  webhook_auth_header = var.webhook_auth_header
+
+  # Tuning
+  spike_threshold_pct = 50
+  setup_name          = "StackAlert Webhook"
 }
 
 # ── Variables ──────────────────────────────────────────────────
@@ -56,13 +59,17 @@ variable "artifact_s3_key" {
   default = "stackalert-lambda/latest.zip"
 }
 
-variable "telegram_bot_token" {
-  type      = string
-  sensitive = true
+variable "webhook_url" {
+  type        = string
+  sensitive   = true
+  description = "HTTP endpoint to POST alerts to (e.g. https://api.example.com/alerts)."
 }
 
-variable "telegram_chat_id" {
-  type = string
+variable "webhook_auth_header" {
+  type        = string
+  sensitive   = true
+  default     = ""
+  description = "Optional Authorization header value (e.g. 'Bearer sk-...')."
 }
 
 # ── Outputs ────────────────────────────────────────────────────
@@ -73,8 +80,4 @@ output "lambda_function_name" {
 
 output "invoke_spike" {
   value = module.stackalert.invoke_command_spike
-}
-
-output "invoke_digest" {
-  value = module.stackalert.invoke_command_digest
 }
